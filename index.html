@@ -1,0 +1,2677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MÉTRONOME — Simultaneous moves on a real clock</title>
+<style>
+  :root{
+    --fond:#efe6d4; --fond2:#e7dcc6; --fond3:#f7f0e2;
+    --azur:#1f6feb; --corail:#d1495b; --or:#d1495b;
+    --encre:#2b2620; --sous:#7a6f5d; --ligne:rgba(43,38,32,.22);
+    --bois:#8a5a3b; --ivoire:#f7f0e2; --vermillon:#d1495b;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ height:100%; margin:0; }
+  body{
+    background:var(--fond); color:var(--encre);
+    font-family:"Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+    display:flex; flex-direction:column; overflow:hidden;
+    -webkit-user-select:none; user-select:none;
+  }
+  /* Grain papier + vignette sépia très douce (au-dessus du jeu, sous les modales). */
+  body::after{
+    content:""; position:fixed; inset:0; z-index:30; pointer-events:none;
+    background-image:
+      radial-gradient(ellipse at 50% 42%, rgba(0,0,0,0) 52%, rgba(97,66,38,.16) 100%));
+  }
+  /* ---------- En-tête ---------- */
+  header{
+    display:flex; align-items:center; gap:18px; flex-wrap:wrap;
+    padding:10px 18px 8px; border-bottom:1px solid var(--ligne);
+    background:linear-gradient(180deg, rgba(138,90,59,.12) 0%, rgba(138,90,59,0) 100%);
+  }
+  .titre-bloc{ display:flex; flex-direction:column; }
+  h1{
+    margin:0; font-size:21px; letter-spacing:.42em; font-weight:600;
+    color:var(--vermillon); text-shadow:0 1px 0 rgba(255,255,255,.55);
+  }
+  h1 .ornement{ letter-spacing:0; opacity:.55; font-weight:400; }
+  .sous-titre{ font-size:11.5px; color:var(--sous); letter-spacing:.08em; margin-top:2px; }
+  #compteurs{
+    display:flex; align-items:center; gap:14px; font-size:12.5px; color:var(--sous);
+    margin-left:auto; padding:6px 12px; border:1px solid var(--ligne); border-radius:20px;
+    background:rgba(247,240,226,.72);
+  }
+  #compteurs .j{ display:flex; align-items:center; gap:6px; }
+  #compteurs .nom.j-azur{ color:var(--azur); }
+  #compteurs .nom.j-corail{ color:var(--corail); }
+  .pastilles{ display:inline-flex; gap:3px; }
+  .pastilles i{
+    width:9px; height:9px; border-radius:50%; display:inline-block;
+    border:1px solid var(--sous); background:transparent; transition:all .25s;
+  }
+  .pastilles i.pleine.j-azur{ background:var(--azur); border-color:var(--azur); box-shadow:0 1px 2px rgba(43,38,32,.35); }
+  .pastilles i.pleine.j-corail{ background:var(--corail); border-color:var(--corail); box-shadow:0 1px 2px rgba(43,38,32,.35); }
+  .actions{ display:flex; gap:8px; }
+  button{
+    font-family:inherit; cursor:pointer; color:var(--encre);
+    background:transparent; border:1px solid var(--bois);
+    border-radius:8px; padding:7px 14px; font-size:13px; letter-spacing:.04em;
+    transition:background .15s, box-shadow .15s, transform .05s;
+  }
+  button:hover{ background:rgba(138,90,59,.12); }
+  button:active{ transform:translateY(1px); }
+  button:focus-visible{ outline:2px solid var(--bois); outline-offset:2px; }
+  button.primaire{
+    background:linear-gradient(180deg, #dc5a6c, var(--vermillon));
+    color:#fdf8ec; border-color:#b13a4b; font-weight:600;
+  }
+  button.primaire:hover{ box-shadow:0 3px 12px rgba(209,73,91,.35); }
+  button.confirm{ border-color:var(--vermillon); color:var(--vermillon); }
+  /* ---------- Corps ---------- */
+  main{ flex:1; display:flex; min-height:0; }
+  #zone-plateau{ flex:1; min-width:0; position:relative; }
+  #plateau{ position:absolute; inset:0; width:100%; height:100%; display:block; }
+  /* ---------- Panneau latéral ---------- */
+  #panneau{
+    width:360px; flex:none; display:flex; flex-direction:column; gap:10px;
+    padding:12px 14px; border-left:1px solid var(--bois);
+    background:rgba(247,240,226,.92); overflow:hidden;
+  }
+  #info-phase{ border:1px solid var(--ligne); border-radius:10px; padding:10px 12px; background:rgba(255,252,244,.65); }
+  #info-phase .mesure{ font-size:11px; color:var(--sous); letter-spacing:.18em; text-transform:uppercase; }
+  #info-phase .phase{ font-size:15.5px; margin-top:3px; font-weight:600; }
+  #info-phase .phase .j-azur{ color:var(--azur); }
+  #info-phase .phase .j-corail{ color:var(--corail); }
+  #info-phase .detail{ font-size:12px; color:var(--sous); margin-top:4px; line-height:1.45; }
+  .timer-ligne{ display:flex; align-items:center; gap:10px; margin-top:9px; }
+  .timer-bar{ flex:1; height:8px; border-radius:4px; background:rgba(43,38,32,.16); overflow:hidden; }
+  #timer-fill{ height:100%; width:100%; background:linear-gradient(90deg, #a87d5c, #8a5a3b); border-radius:4px; }
+  #timer-txt{ font-variant-numeric:tabular-nums; font-size:21px; font-weight:700; color:var(--encre); min-width:56px; text-align:right; }
+  .timer-alerte #timer-fill{ background:var(--vermillon); }
+  .timer-alerte #timer-txt{ color:var(--corail); animation:pulse .5s infinite alternate; }
+  @keyframes pulse{ from{ opacity:1; } to{ opacity:.45; } }
+  .durees{ display:flex; align-items:center; gap:6px; margin-top:9px; font-size:11.5px; color:var(--sous); }
+  .durees button{ padding:3px 9px; font-size:11.5px; border-radius:6px; }
+  .durees button.actif{ background:rgba(209,73,91,.14); box-shadow:inset 0 0 0 1px var(--vermillon); color:var(--vermillon); }
+  /* Grille de programmation */
+  #zone-prog{ display:flex; flex-direction:column; gap:9px; }
+  .prog-grille{
+    display:grid; grid-template-columns:minmax(118px,1fr) 46px 46px 46px;
+    gap:5px; align-items:center;
+  }
+  .pg-head{ font-size:10.5px; color:var(--sous); text-align:center; letter-spacing:.12em; text-transform:uppercase; }
+  .pg-label{ font-size:12px; color:var(--encre); display:flex; align-items:center; gap:7px; white-space:nowrap; overflow:hidden; }
+  .pg-label .pt{ width:9px; height:9px; border-radius:50%; flex:none; border:1px solid rgba(43,38,32,.55); }
+  .pt.azur{ background:var(--azur); }
+  .pt.corail{ background:var(--corail); }
+  .pg-label .coord{ color:var(--sous); font-size:10.5px; }
+  .pg-cell{
+    height:40px; padding:0; display:flex; align-items:center; justify-content:center;
+    border-radius:8px; border:1px solid rgba(43,38,32,.28); background:rgba(43,38,32,.05);
+  }
+  .pg-cell svg{ display:block; }
+  .pg-cell.vide span{ color:rgba(43,38,32,.35); font-size:15px; }
+  .pg-cell.actif{ border-color:var(--vermillon); box-shadow:0 0 0 1px var(--vermillon), 0 2px 8px rgba(209,73,91,.25); background:rgba(209,73,91,.08); }
+  .pave{
+    display:grid; grid-template-areas:". nw ne ." "w rst e ." "sw se . .";
+    grid-template-columns:repeat(4, 50px); gap:5px; justify-content:center;
+  }
+  .pave button{
+    width:50px; height:44px; border-radius:9px; display:flex; align-items:center; justify-content:center;
+    border:1px solid rgba(43,38,32,.32); background:rgba(43,38,32,.05); color:var(--encre);
+  }
+  .pave button.surbrillance{ border-color:var(--vermillon); box-shadow:0 0 0 1px var(--vermillon), 0 2px 8px rgba(209,73,91,.3); }
+  .pave .rst{ font-size:17px; font-weight:700; }
+  .aide{ font-size:11px; color:var(--sous); line-height:1.5; }
+  #btn-valider{ align-self:stretch; padding:9px; }
+  /* Programme révélé (résolution) */
+  #zone-revele{ display:flex; flex-direction:column; gap:7px; }
+  .rev-bloc{ border:1px solid var(--ligne); border-radius:10px; padding:8px 10px; background:rgba(255,252,244,.6); }
+  .rev-bloc .rev-titre{ font-size:11px; letter-spacing:.14em; text-transform:uppercase; margin-bottom:6px; }
+  .rev-titre.j-azur{ color:var(--azur); } .rev-titre.j-corail{ color:var(--corail); }
+  .rev-ligne{ display:flex; align-items:center; gap:8px; font-size:12.5px; padding:2px 0; }
+  .rev-ligne .fl{ width:30px; height:30px; display:flex; align-items:center; justify-content:center; border-radius:7px; border:1px solid rgba(43,38,32,.22); }
+  .rev-ligne .fl.fait{ opacity:.32; }
+  .rev-ligne .fl.courant{ border-color:var(--vermillon); box-shadow:0 0 0 1px var(--vermillon); }
+  /* Journal */
+  #journal-wrap{ flex:1; min-height:60px; display:flex; flex-direction:column; border:1px solid var(--ligne); border-radius:10px; background:rgba(255,252,244,.55); overflow:hidden; }
+  #journal-wrap .jt{ font-size:10.5px; color:var(--sous); letter-spacing:.16em; text-transform:uppercase; padding:7px 10px 4px; }
+  #journal{ flex:1; overflow-y:auto; list-style:none; margin:0; padding:2px 10px 8px; font-size:12px; line-height:1.5; }
+  #journal li{ padding:3px 0; border-bottom:1px dashed rgba(43,38,32,.16); color:var(--encre); }
+  #journal li .badge{ color:var(--sous); font-variant-numeric:tabular-nums; margin-right:5px; font-size:10.5px; }
+  #journal .j-azur{ color:var(--azur); } #journal .j-corail{ color:var(--corail); }
+  #journal .j-or{ color:var(--vermillon); }
+  /* ---------- Overlays ---------- */
+  .overlay{
+    position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+    background:rgba(61,48,35,.32); z-index:40; padding:20px;
+    opacity:1; transition:opacity .25s;
+  }
+  .overlay.cache{ opacity:0; pointer-events:none; }
+  .carte{
+    max-width:600px; width:100%; background:linear-gradient(180deg,#faf4e6,#f1e8d3);
+    border:1px solid var(--bois); border-radius:14px; padding:26px 30px;
+    box-shadow:0 18px 50px rgba(59,44,28,.38), inset 0 0 0 4px #faf4e6, inset 0 0 0 5px rgba(138,90,59,.5);
+    max-height:86vh; overflow-y:auto;
+  }
+  .carte h2{ margin:0 0 6px; letter-spacing:.28em; font-size:17px; color:var(--vermillon); font-weight:600; }
+  .carte .sur{ color:var(--sous); font-size:12.5px; letter-spacing:.06em; }
+  .carte .gros-passe{ font-size:22px; margin:16px 0 4px; font-weight:600; }
+  .gros-passe.j-azur{ color:var(--azur); } .gros-passe.j-corail{ color:var(--corail); }
+  .carte .texte{ color:var(--encre); font-size:13.5px; line-height:1.6; }
+  .carte .actions-bas{ display:flex; gap:10px; margin-top:20px; flex-wrap:wrap; }
+  #overlay-regles .carte h3{ color:var(--bois); font-size:13px; letter-spacing:.14em; margin:16px 0 4px; text-transform:uppercase; }
+  #overlay-regles .carte p, #overlay-regles .carte li{ font-size:12.8px; line-height:1.62; color:var(--encre); }
+  #overlay-regles .carte ul{ margin:4px 0; padding-left:20px; }
+  #overlay-regles .impossible{
+    margin-top:16px; padding:10px 12px; border:1px solid var(--bois); border-radius:9px;
+    color:var(--bois); font-size:12.8px; background:rgba(138,90,59,.08);
+  }
+  .vainqueur-azur{ color:var(--azur); } .vainqueur-corail{ color:var(--corail); } .vainqueur-egalite{ color:var(--vermillon); }
+  /* ---------- Accueil / salon / en ligne ---------- */
+  .mode-liste{ display:flex; flex-direction:column; gap:12px; margin-top:18px; }
+  .mode-bloc{
+    display:block; width:100%; text-align:left; padding:13px 16px; border-radius:11px;
+    border:1px solid var(--bois); background:rgba(255,252,244,.82);
+    transition:background .15s, box-shadow .15s, transform .05s;
+  }
+  .mode-bloc:hover{ background:rgba(255,252,244,.97); box-shadow:0 4px 14px rgba(59,44,28,.18); }
+  .mode-bloc:active{ transform:translateY(1px); }
+  .mode-bloc .mode-titre{ font-size:15px; font-weight:600; letter-spacing:.03em; }
+  .mode-bloc .mode-desc{ font-size:12px; color:var(--sous); margin-top:3px; line-height:1.5; }
+  .acc-statut{ min-height:18px; margin-top:12px; font-size:12.5px; color:var(--corail); text-align:center; }
+  #salon-statut{ font-size:13.5px; margin:14px 0 4px; line-height:1.55; }
+  .salon-point{
+    display:inline-block; width:8px; height:8px; margin-right:8px; border-radius:50%;
+    background:var(--vermillon); vertical-align:1px; animation:pulse .9s infinite alternate;
+  }
+  /* ---------- Accueil : voile ivoire, plateau visible, bouton central (capture auto) ---------- */
+  #overlay-accueil{ background:rgba(247,240,226,.52); }
+  #acc-ia-central{
+    position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    width:300px; height:104px; border-radius:14px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px;
+    background:linear-gradient(180deg,#dc5a6c,var(--vermillon)); color:#fdf8ec;
+    border:1px solid #b13a4b; font-weight:600;
+    box-shadow:0 10px 30px rgba(59,44,28,.32), inset 0 0 0 3px rgba(253,248,236,.4);
+  }
+  #acc-ia-central:hover{ box-shadow:0 12px 36px rgba(209,73,91,.45), inset 0 0 0 3px rgba(253,248,236,.55); }
+  #acc-ia-central .acc-central-titre{ font-size:19px; letter-spacing:.03em; }
+  #acc-ia-central .acc-central-desc{ font-size:11.5px; font-weight:400; opacity:.92; }
+  .acc-secondaires{
+    position:absolute; left:50%; top:calc(50% + 152px); transform:translateX(-50%);
+    width:min(500px,92vw); display:flex; flex-direction:column; gap:9px;
+  }
+  .acc-secondaires .mode-bloc{ padding:10px 14px; background:rgba(255,252,244,.88); }
+  .acc-options{ display:flex; justify-content:center; margin-top:2px; }
+  .acc-options button{ background:rgba(255,252,244,.85); }
+  @media (max-height:720px){
+    .acc-secondaires{ top:calc(50% + 126px); gap:7px; }
+    .acc-secondaires .mode-desc{ display:none; }
+    .acc-secondaires .mode-bloc{ padding:8px 12px; }
+  }
+  @media (max-height:540px){
+    .acc-secondaires{ top:auto; bottom:10px; }
+  }
+  /* Écran large : titre en haut à gauche, secondaires en bas à droite (sur le panneau)
+     pour laisser le plateau dégagé autour du bouton central. */
+  @media (min-width:941px){
+    .acc-secondaires{ left:auto; right:26px; top:auto; bottom:22px; transform:none; width:380px; }
+  }
+  /* ---------- Responsive ---------- */
+  @media (max-width:940px){
+    main{ flex-direction:column; }
+    #zone-plateau{ height:48vh; flex:none; }
+    #panneau{ width:100%; flex:1; border-left:none; border-top:1px solid var(--ligne); }
+    header{ gap:10px; padding:8px 12px 6px; }
+    #compteurs{ margin-left:0; }
+    h1{ font-size:17px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="titre-bloc">
+    <h1>MÉTRONOME</h1>
+    <div class="sous-titre" data-i18n="sousTitre">Simultaneous moves on a real clock</div>
+  </div>
+  <div id="compteurs" data-i18n-title="compteursTitle" title="Consecutive centre holds — two measures in a row wins">
+    <span style="letter-spacing:.14em; font-size:10.5px; text-transform:uppercase;" data-i18n="centreLbl">Centre</span>
+    <span class="j"><span class="nom j-azur">Azur</span><span class="pastilles" id="past-azur"><i></i><i></i></span></span>
+    <span class="j"><span class="nom j-corail">Corail</span><span class="pastilles" id="past-corail"><i></i><i></i></span></span>
+  </div>
+  <div class="actions">
+    <button id="btn-lang">FR</button>
+    <button id="btn-nouvelle" data-i18n="nouvellePartie">New game</button>
+    <button id="btn-regles" data-i18n="regles">Rules</button>
+    <button id="btn-quitter-salon" data-i18n="quitterSalon" hidden>Leave room</button>
+    <button id="btn-accueil" data-i18n="accueilBtn" hidden>Home</button>
+  </div>
+</header>
+
+<main>
+  <section id="zone-plateau"><canvas id="plateau"></canvas></section>
+  <aside id="panneau">
+    <div id="info-phase"></div>
+    <div id="zone-timer"></div>
+    <div id="zone-prog"></div>
+    <div id="zone-revele"></div>
+    <div id="journal-wrap">
+      <div class="jt" data-i18n="journalTitre">Game log</div>
+      <ul id="journal"></ul>
+    </div>
+  </aside>
+</main>
+
+<!-- Écran d’accueil : plateau visible derrière le voile ivoire ; le titre reste
+     celui de l’en-tête (visible à travers le voile) ; bouton « Play against the AI »
+     au centre exact de l’écran (capture automatique). -->
+<div class="overlay" id="overlay-accueil">
+  <button id="acc-ia-central">
+    <span class="acc-central-titre" data-i18n="accIaCentral">Play against the AI</span>
+    <span class="acc-central-desc" data-i18n="accIaCentralDesc">Normal — you play Azur, the AI programs in secret</span>
+  </button>
+  <div class="acc-secondaires">
+    <button class="mode-bloc" id="acc-hotseat">
+      <div class="mode-titre" data-i18n="accHotseat">Two players — same screen</div>
+      <div class="mode-desc" data-i18n-html="accHotseatDesc">Each player programs in turn behind the pass screen, then the three ticks fall together.</div>
+    </button>
+    <button class="mode-bloc" id="acc-ia-facile">
+      <div class="mode-titre" data-i18n="accIaFacile">Play against the AI (Easy)</div>
+      <div class="mode-desc" data-i18n-html="accIaFacileDesc">The AI plays almost at random — a gentle start.</div>
+    </button>
+    <button class="mode-bloc" id="acc-ligne">
+      <div class="mode-titre" data-i18n="accLigne">Online — LOB7 room</div>
+      <div class="mode-desc" data-i18n-html="accLigneDesc">Two browsers, one lob7.com room; smaller clientId = Azur, host-referee.</div>
+    </button>
+    <div class="acc-options">
+      <button id="acc-regles" data-i18n="lireRegles">Read the rules</button>
+    </div>
+    <div class="acc-statut" id="acc-statut"></div>
+  </div>
+</div>
+
+<!-- Salon LOB7 : connexion puis attente de l’adversaire (statut posé par le JS) -->
+<div class="overlay cache" id="overlay-salon">
+  <div class="carte" style="text-align:center; max-width:430px;">
+    <h2>SALON LOB7</h2>
+    <div class="texte" id="salon-statut"></div>
+    <div class="actions-bas" style="justify-content:center;">
+      <button class="confirm" id="btn-salon-quitter" data-i18n="quitterSalon">Leave room</button>
+    </div>
+  </div>
+</div>
+
+<!-- Connexion perdue (mode en ligne) -->
+<div class="overlay cache" id="overlay-perdu">
+  <div class="carte" style="text-align:center; max-width:460px;">
+    <h2 data-i18n="perduTitre">CONNECTION LOST</h2>
+    <div class="texte" id="perdu-detail" style="margin-top:10px;"></div>
+    <div class="actions-bas" style="justify-content:center;">
+      <button class="primaire" id="btn-perdu-accueil" data-i18n="retourAccueil">Back to home</button>
+    </div>
+  </div>
+</div>
+
+<!-- Écran « passe l’appareil » (textes posés par montrerPasse) -->
+<div class="overlay cache" id="overlay-passe">
+  <div class="carte" style="text-align:center; max-width:430px;">
+    <h2 id="passe-mesure"></h2>
+    <div class="gros-passe" id="passe-titre"></div>
+    <div class="texte" id="passe-sous" style="margin-top:8px;"></div>
+    <div class="actions-bas" style="justify-content:center;">
+      <button class="primaire" id="btn-commencer-prog"></button>
+    </div>
+  </div>
+</div>
+
+<!-- Modale règles (contenu généré par T("reglesHtml")) -->
+<div class="overlay cache" id="overlay-regles">
+  <div class="carte">
+    <div id="regles-contenu"></div>
+    <div class="actions-bas"><button class="primaire" id="btn-fermer-regles" data-i18n="fermer">Close</button></div>
+  </div>
+</div>
+
+<!-- Écran de fin (textes posés par majFinTextes) -->
+<div class="overlay cache" id="overlay-fin">
+  <div class="carte" style="text-align:center; max-width:460px;">
+    <h2 id="fin-titre"></h2>
+    <div class="texte" id="fin-raison" style="margin-top:10px;"></div>
+    <div class="actions-bas" style="justify-content:center;">
+      <button class="primaire" id="btn-rejouer" data-i18n="rejouer">Play again</button>
+      <button id="btn-voir-plateau" data-i18n="voirPlateau">View the board</button>
+      <button id="btn-fin-accueil" data-i18n="accueilBtn" hidden>Home</button>
+    </div>
+  </div>
+</div>
+
+<!-- SDK LOB7 Rooms — copie INLINE et INTACTE de C:devlob7siteexamplesprism-pairlob7-rooms.js -->
+<script>
+/* LOB7 Rooms SDK. Bundle locally; load before the optional lob7-rooms-p2p.js helper. */
+(function () {
+  'use strict';
+  var PARENT_ORIGINS = ['https://lob7.com', 'https://www.lob7.com'];
+  var active = null;
+  var connecting = null;
+  function identifier() {
+    var bytes = new Uint8Array(16);
+    globalThis.crypto.getRandomValues(bytes);
+    return Array.from(bytes, function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+  }
+  function errorFrom(value) {
+    var error = new Error(value.message || 'Room request failed.');
+    error.code = value.code || 'ROOM_REQUEST_FAILED';
+    if (Number.isInteger(value.status)) error.status = value.status;
+    if (Number.isFinite(value.retryAfterSeconds)) error.retryAfterSeconds = value.retryAfterSeconds;
+    return error;
+  }
+  function validData(value) {
+    var todo = [{ value: value, depth: 0 }], seen = new Set(), nodes = 0;
+    while (todo.length) {
+      var item = todo.pop(), current = item.value;
+      if (++nodes > 8192 || item.depth > 64) return false;
+      if (typeof current === 'string') { if (current.length > 8192) return false; continue; }
+      if (current === null || typeof current === 'boolean') continue;
+      if (typeof current === 'number') { if (!Number.isFinite(current)) return false; continue; }
+      if (typeof current !== 'object' || seen.has(current)) return false;
+      seen.add(current);
+      if (!Array.isArray(current) && Object.getPrototypeOf(current) !== Object.prototype && Object.getPrototypeOf(current) !== null) return false;
+      var keys = Object.keys(current);
+      if (keys.length + todo.length > 8192 || keys.some(function (key) { return key.length > 8192; })) return false;
+      if (Array.isArray(current) && (current.length > 8192 || keys.length !== current.length)) return false;
+      Object.values(current).forEach(function (child) { todo.push({ value: child, depth: item.depth + 1 }); });
+    }
+    try { return new TextEncoder().encode(JSON.stringify(value)).byteLength <= 8192; } catch (_) { return false; }
+  }
+  function connection(room, port) {
+    var pending = new Map(), stopped = false, stopSubscription = null, subscriptionError = null, disconnectListeners = new Set();
+    function disconnect(reason) {
+      if (stopped) return;
+      stopped = true;
+      globalThis.removeEventListener('pagehide', leaveOnExit);
+      disconnectListeners.forEach(function (listener) { listener(errorFrom(reason)); });
+      disconnectListeners.clear();
+      var onError = subscriptionError;
+      if (stopSubscription) stopSubscription();
+      if (onError) { try { onError(errorFrom(reason)); } catch (_) { /* observer only */ } }
+      pending.forEach(function (task) { globalThis.clearTimeout(task.timer); task.reject(errorFrom(reason)); });
+      pending.clear();
+      port.close();
+      if (active === result) active = null;
+    }
+    port.onmessage = function (event) {
+      var response = event.data;
+      if (response && response.type === 'disconnected') return disconnect(response.error || { code: 'ROOM_CHANGED' });
+      var task = response && pending.get(response.requestId);
+      if (!task) return;
+      globalThis.clearTimeout(task.timer);
+      pending.delete(response.requestId);
+      if (response.error) task.reject(errorFrom(response.error));
+      else task.resolve(response.result);
+    };
+    port.onmessageerror = function () { disconnect({ code: 'ROOM_CONNECTION_CLOSED', message: 'The room connection closed. Connect again.' }); };
+    port.start();
+    function request(method, params) {
+      if (stopped) return Promise.reject(errorFrom({ code: 'ROOM_CONNECTION_CLOSED', message: 'Connect to the selected room again.' }));
+      if (pending.size >= 4) return Promise.reject(errorFrom({ code: 'ROOM_BUSY', message: 'Too many requests are in progress.', retryAfterSeconds: 3 }));
+      var id = identifier();
+      return new Promise(function (resolve, reject) {
+        var timer = globalThis.setTimeout(function () {
+          pending.delete(id);
+          reject(errorFrom({ code: 'ROOM_TIMEOUT', message: 'The room request timed out. Retry a send using the same idempotency key.' }));
+        }, 25000);
+        pending.set(id, { resolve: resolve, reject: reject, timer: timer });
+        try { port.postMessage({ requestId: id, method: method, params: params }); }
+        catch (_) { globalThis.clearTimeout(timer); pending.delete(id); reject(errorFrom({ code: 'ROOM_PAYLOAD_INVALID' })); }
+      });
+    }
+    var result = {
+      room: room,
+      read: function (options) {
+        options = options || {};
+        return request('read', { after: options.after === undefined ? 0 : options.after, limit: options.limit === undefined ? 50 : options.limit }).then(function (batch) {
+          if (Number.isSafeInteger(batch.cursor)) room.lastSequence = Math.max(room.lastSequence || 0, batch.cursor);
+          return batch;
+        });
+      },
+      send: function (data, options) {
+        var key = options && options.idempotencyKey || identifier();
+        var promise = validData(data)
+          ? request('send', { data: data, idempotencyKey: key })
+          : Promise.reject(errorFrom({ code: 'ROOM_PAYLOAD_INVALID', message: 'Use finite JSON data no larger than 8192 UTF-8 bytes.' }));
+        return promise.then(function (response) { return response.message; }).catch(function (error) { error.idempotencyKey = key; throw error; });
+      },
+      subscribe: function (callback, options) {
+        options = options || {};
+        if (typeof callback !== 'function') throw new TypeError('subscribe requires a callback.');
+        if (stopSubscription) throw errorFrom({ code: 'ROOM_SUBSCRIPTION_EXISTS', message: 'Stop the current subscription before starting another.' });
+        if (stopped) throw errorFrom({ code: 'ROOM_CONNECTION_CLOSED', message: 'Connect to the selected room again.' });
+        var cursor = options.after === undefined ? 0 : options.after;
+        if (!Number.isSafeInteger(cursor) || cursor < 0) throw new TypeError('after must be a nonnegative integer.');
+        var cancelled = false, timer = null, delay = 3000;
+        function stop() { cancelled = true; if (timer !== null) globalThis.clearTimeout(timer); if (stopSubscription === stop) { stopSubscription = null; subscriptionError = null; } }
+        async function poll() {
+          if (cancelled || stopped) return;
+          try {
+            var batch = await result.read({ after: cursor });
+            for (var message of batch.messages) {
+              if (cancelled || stopped) return;
+              await callback(message);
+              cursor = message.sequence;
+            }
+            cursor = Math.max(cursor, batch.cursor);
+            delay = batch.messages.length ? 3000 : Math.min(delay * 1.5, 15000);
+            delay = Math.max(delay, (batch.pollAfterSeconds || 3) * 1000);
+          } catch (error) {
+            if (cancelled || stopped) return;
+            if (['ROOM_EXPIRED', 'ROOM_NOT_FOUND', 'RELEASE_NOT_FOUND', 'ACCOUNT_SUSPENDED', 'GAME_NOT_ALLOWED', 'SCOPE_REQUIRED', 'AUTH_INVALID', 'AUTH_REQUIRED'].includes(error.code)) {
+              disconnect(error);
+              return;
+            }
+            delay = Math.max(Math.min(delay * 2, 30000), (error.retryAfterSeconds || 0) * 1000);
+            if (typeof options.onError === 'function') { try { options.onError(error); } catch (_) { /* callback cannot break cleanup */ } }
+          }
+          if (!cancelled && !stopped) timer = globalThis.setTimeout(poll, delay + Math.floor(Math.random() * 250));
+        }
+        stopSubscription = stop;
+        subscriptionError = typeof options.onError === 'function' ? options.onError : null;
+        void poll();
+        return stop;
+      },
+    };
+    if (typeof globalThis.LOB7RoomsP2P === 'function') result.connectPeer = function (options) {
+      return globalThis.LOB7RoomsP2P(result, options, function (listener) {
+        if (stopped) throw errorFrom({ code: 'ROOM_CONNECTION_CLOSED', message: 'Connect to the selected room again.' });
+        disconnectListeners.add(listener);
+        return function () { disconnectListeners.delete(listener); };
+      }, { identifier: identifier, errorFrom: errorFrom, validData: validData });
+    };
+    function leaveOnExit(event) {
+      if (event.persisted) return;
+      disconnect({ code: 'ROOM_CONNECTION_CLOSED', message: 'The game document closed.' });
+    }
+    globalThis.addEventListener('pagehide', leaveOnExit);
+    return result;
+  }
+  function connect() {
+    if (active) return Promise.resolve(active);
+    if (connecting) return connecting;
+    if (globalThis.parent === globalThis) return Promise.reject(errorFrom({ code: 'ROOM_PREVIEW_REQUIRED', message: 'Open this project in its LOB7 preview and choose a room.' }));
+    connecting = new Promise(function (resolve, reject) {
+      var nonce = identifier(), requestId = identifier(), timeout, deferred;
+      function cleanup() {
+        globalThis.removeEventListener('message', receive);
+        globalThis.removeEventListener('load', ready);
+        globalThis.clearTimeout(timeout);
+        if (deferred !== undefined) globalThis.clearTimeout(deferred);
+      }
+      function receive(event) {
+        var response = event.data;
+        if (event.source !== globalThis.parent || !PARENT_ORIGINS.includes(event.origin) || !response || response.type !== 'lob7.rooms.connected'
+          || response.nonce !== nonce || response.requestId !== requestId) return;
+        cleanup();
+        if (response.error) return reject(errorFrom(response.error));
+        if (!response.room || !event.ports[0]) return reject(errorFrom({ code: 'ROOM_PROTOCOL_INVALID' }));
+        active = connection(response.room, event.ports[0]);
+        resolve(active);
+      }
+      // Run after the parent's iframe load handler has invalidated any previous document.
+      function ready() { deferred = globalThis.setTimeout(function () { PARENT_ORIGINS.forEach(function (origin) { globalThis.parent.postMessage({ type: 'lob7.rooms.connect', nonce: nonce, requestId: requestId }, origin); }); }, 0); }
+      globalThis.addEventListener('message', receive);
+      timeout = globalThis.setTimeout(function () { cleanup(); reject(errorFrom({ code: 'ROOM_BRIDGE_UNAVAILABLE', message: 'This document is not connected to the LOB7 room panel.' })); }, 8000);
+      if (globalThis.document.readyState === 'complete') ready();
+      else globalThis.addEventListener('load', ready, { once: true });
+    }).finally(function () { connecting = null; });
+    return connecting;
+  }
+  globalThis.LOB7Rooms = Object.freeze({ connect: connect });
+})();
+</script>
+
+
+<script>
+"use strict";
+/* ============================================================
+   MÉTRONOME — jeu de stratégie à coups simultanés.
+   Un seul fichier, zéro dépendance, zéro réseau (contrainte file://).
+   Structure : [Assets] [CORE logique pure] [État] [Machine à états]
+               [Rendu canvas] [UI DOM] [Événements] [Boucle].
+   L’état (G) est strictement séparé du rendu.
+   ============================================================ */
+
+/* ============================================================
+   I18N — STR : TOUTES les chaînes UI (anglais par défaut, français).
+   T(cle, vars) : valeur de la langue courante (fonction autorisée),
+   remplace chaque {x} par vars.x. Bascule FR/EN : bouton #btn-lang,
+   mémorisé en sessionStorage (muet, compatible file://).
+   « MÉTRONOME », « Azur » et « Corail » restent inchangés.
+   ============================================================ */
+const STR = {
+en:{
+  titre:"MÉTRONOME — Simultaneous moves on a real clock",
+  sousTitre:"Simultaneous moves on a real clock",
+  compteursTitle:"Consecutive centre holds — two measures in a row wins",
+  centreLbl:"Centre",
+  nouvellePartie:"New game", confirmer:"Confirm?",
+  regles:"Rules", quitterSalon:"Leave room", accueilBtn:"Home",
+  journalTitre:"Game log", langVers:"FR",
+  accSous:"Simultaneous moves on a real clock — choose your mode",
+  accIaCentral:"Play against the AI",
+  accIaCentralDesc:"Normal — you play Azur, the AI programs in secret",
+  accHotseat:"Two players — same screen",
+  accHotseatDesc:"Each player programs in turn behind the pass screen, then the three ticks fall together.",
+  accIaFacile:"Play against the AI (Easy)",
+  accIaFacileDesc:"The AI plays almost at random — a gentle start.",
+  accLigne:"Online — LOB7 room",
+  accLigneDesc:"Two browsers, one lob7.com room; smaller clientId = Azur, host-referee.",
+  lireRegles:"Read the rules",
+  salonConnexion:"Connecting to the LOB7 room…",
+  salonAttente:"LOB7 room — waiting for an opponent…",
+  salonFerme:"The chosen room no longer accepts messages.",
+  salonIndispo:"LOB7 room unavailable{code}.",
+  besoinLob7:"Online mode requires lob7.com.",
+  perduTitre:"CONNECTION LOST",
+  retourAccueil:"Back to home",
+  perduDetail:"The room link was cut{code}. The online game stops here — the “same screen” and “against the AI” modes remain available from the home screen.",
+  mesure:"MEASURE {n}",
+  passeTitre:"Pass the device to {nom}",
+  passeSous:"Positions stay public.<br>Only the program you are about to enter is secret.",
+  passeBtn:"{nom}: program",
+  passeIaTitre:"Your turn — {nom}",
+  passeIaSous:"You play <b>Azur</b>. The AI (<b>Corail</b>) will program in secret after you.",
+  passeIaBtn:"Azur: program",
+  finAzur:"AZUR WINS", finCorail:"CORAIL WINS", finEgalite:"DRAW",
+  rejouer:"Play again", voirPlateau:"View the board", fermer:"Close",
+  raisonEgalite:"Both sides lost all their pieces on the same tick.",
+  raisonAzur:"Azur has no pieces left.",
+  raisonCorail:"Corail has no pieces left.",
+  raisonCentre:"{nom} held the centre for two measures in a row.",
+  raisonHote:"Game over (host verdict).",
+  hudAccueil:"Home screen",
+  hudAccueilDetail:"Choose a mode: two players on the same screen, against the AI, or online in a LOB7 room.",
+  hudPasseIa:"Your turn — {nom}",
+  hudPasseIaDetail:"Timer and screen unchanged; the AI will program in secret after you.",
+  hudPasse:"Pass the device to {nom}",
+  hudPasseDetail:"Positions are public; each player programs in secret.",
+  hudProg:"Your turn to program — {nom}{toi}",
+  toi:" (you)",
+  hudProgDetail:"One direction (or “—”) per piece and per tick. Enter it in the grid or by clicking around the selected piece.",
+  hudProgDetailLigne:"One direction (or “—”) per piece and per tick. The opponent programs in parallel on their screen — their program stays hidden until resolution.",
+  enAttente:"Waiting…",
+  hudAttenteIaDetail:"The AI’s (Corail) program is never shown before resolution.",
+  hudAttenteLigneDetail:"The three ticks are resolved by the host (Azur), then replayed identically on both screens.",
+  hudResolution:"Resolution — tick {n}/3",
+  hudResolutionDetail:"The steps of each tick are simultaneous.",
+  emporte:"{nom} wins", egaliteCourt:"Draw", partieTerminee:"Game over",
+  mesureLbl:"Measure {n}", timerLbl:"Timer:",
+  tic:"Tick {n}", metronomeLbl:"Metronome {n}",
+  rester:"Stay in place", valider:"Validate the program",
+  aideProg:"Unfilled “·” cells mean “stay” when time runs out. Click a neighbouring cell on the board to program directly.",
+  programmeLbl:"{nom}’s program",
+  dirs:["E","NE","NW","W","SW","SE"],
+  et:" and ",
+  diffFacile:"easy", diffNormal:"normal",
+  jNouvelle:"New game — {azur} programs first.",
+  jIa:"Game against the AI ({diff}) — you play {azur}.",
+  jLigne:"LOB7 room — election: the smaller clientId becomes {azur} (host-referee). You are {toi}.",
+  jTemps:"Time is up — {nom}’s unentered orders become “stay”.",
+  jValide:"{nom} has validated their program.",
+  attenteIa:"The AI is programming…",
+  jIaProgramme:"{corail} (AI) has programmed in secret.",
+  jResMesure:"Measure {n} — resolution.",
+  jMur:function(v){ return v.noms + (v.nb > 1 ? " bounce" : " bounces") + ": off the board."; },
+  jOccupee:function(v){ return v.noms + (v.nb > 1 ? " bounce" : " bounces") + ": cell occupied by " + v.par + "."; },
+  jSwap:"Crossed swap: {noms} bounce.",
+  jAllie:"Allied collision: {noms} bounce.",
+  jDuel:'<span class="j-or">Duel</span> at ({q}, {r}): {noms} eliminate each other.',
+  jFinMesure:"End of measure: {nom} holds the centre ({n}/2).",
+  jFinMesureZero:"End of measure: the centre is not held by a single player — counters reset to zero.",
+  attenteEnvoye:"Program sent — waiting for the host (Azur) to resolve…",
+  attenteRecu:"Corail’s program received — resolving…",
+  attenteCorail:"Waiting for Corail’s program…",
+  jMesureLigne:"Measure {n} — {nom} (you) programs; the opponent programs in parallel, in secret.",
+  jEnvoiProgramme:"Corail’s program sent to the host (Azur).",
+  jRecuProgramme:"Corail’s program received — the host resolves the measure.",
+  jHoteResout:"Measure {n} resolved by the host — broadcast to both screens.",
+  jRejeu:"Host resolution received (measure {n}) — replaying the ticks.",
+  jAlerteSalon:"Room: transient hiccup ({code}) — resuming automatically.",
+  jConnexionPerdue:"Connection lost{code} — back to the home screen.",
+  reglesHtml:`<h2>RULES</h2>
+<div class="sur">Metronome — simultaneous moves on a real clock</div>
+<h3>The board</h3>
+<p>A hexagon of <b>19 cells</b> (radius 2) in axial coordinates. Each player commands
+<b>3 identical metronomes</b>: Azur in the south (row r&nbsp;=&nbsp;+2), Corail in the north (r&nbsp;=&nbsp;−2), mirrored.</p>
+<h3>The goal — two ways to win</h3>
+<ul>
+  <li><b>Elimination</b>: reduce your opponent to zero pieces (checked after every tick).</li>
+  <li><b>The centre</b>: at the end of a measure, if a <b>single</b> player occupies the centre (0,0),
+  their “centre” counter increases; otherwise both counters reset to zero.
+  <b>Two consecutive measures</b> holding the centre = victory.</li>
+</ul>
+<h3>A measure</h3>
+<p>1) <b>Azur programs</b> (in secret, behind the “Pass the device” screen);
+2) <b>Corail programs</b> (in secret); 3) <b>Resolution</b>: 3 ticks played one after the other,
+each tick being <b>fully simultaneous</b>.</p>
+<h3>Programming</h3>
+<p>For each of the 3 ticks, each of your living pieces receives <b>one direction out of 6</b>
+or <b>“—”</b> (stay): a piece crosses at most one cell per tick.
+Orders are entered in the grid (rows = pieces, columns = ticks) or by clicking the neighbouring cells on the board.
+<b>Timer</b> per phase (15 / 30 / 60 s): at 0, unentered orders become “stay”.
+The <b>Validate</b> button closes the phase early (unentered orders then count as “stay”).</p>
+<h3>Resolving a tick (simultaneous steps)</h3>
+<ul>
+  <li>Off the board, or onto a cell held by a piece that <b>does not free it</b> this tick → <b>bounce</b> (the piece stays).</li>
+  <li>Two <b>enemy</b> pieces toward the same free cell → <b>duel</b>: both are eliminated.
+  (Three or more pieces from opposing camps toward the same cell: all eliminated; same camp: bounce.)</li>
+  <li>Two <b>allied</b> pieces toward the same cell → both bounce.</li>
+  <li><b>Crossed swap</b> (A toward B’s cell while B heads for A’s) → both bounce.</li>
+  <li>A cell <b>freed</b> this tick can be occupied immediately — chains included
+  (A frees it for B, who frees it for C…).</li>
+  <li>A player reduced to zero pieces mid-measure → the game ends at once. Both at zero on the same tick → <b>draw</b>.</li>
+</ul>
+<p>The centre counter is displayed at all times at the top of the screen.</p>
+<h3>Against the AI</h3>
+<p>You play <b>Azur</b>, the AI plays <b>Corail</b>. Your programming phase is unchanged
+(timer + entry screen); the AI then programs in secret — its program is
+<b>never shown before resolution</b>. On <b>Normal</b> it moves toward the centre and toward
+your nearby pieces, avoids obvious duels (never aiming at a cell adjacent to two enemies,
+never sending two allies to the same cell) and tries to hold the centre at the end of the measure,
+with a touch of noise in its choices. On <b>Easy</b> it plays almost at random
+(valid directions only).</p>
+<h3>Online — LOB7 room</h3>
+<p>Two browsers join the same room on <b>lob7.com</b>, then each player programs
+<b>secretly on their own screen</b> (no pass screen: you never see the opponent’s
+program before resolution). On validation — or when the timer expires —
+<b>Corail sends its program</b>; as soon as both programs are known, <b>Azur
+(host-referee)</b> resolves the three ticks with the game engine and broadcasts the result,
+replayed identically on both screens. Victory is computed by the host.
+<b>Honest note:</b> the host-referee receives Corail’s program at resolution time —
+a curious host could technically read it before launching the animation.
+A disconnection ends the game (back to the home screen).</p>
+<div class="impossible">Why impossible before computers: simultaneous secret programming on a shared clock</div>`
+},
+fr:{
+  titre:"MÉTRONOME — Coups simultanés sur horloge réelle",
+  sousTitre:"Coups simultanés sur horloge réelle",
+  compteursTitle:"Tenues consécutives du centre — deux mesures de suite = victoire",
+  centreLbl:"Centre",
+  nouvellePartie:"Nouvelle partie", confirmer:"Confirmer ?",
+  regles:"Règles", quitterSalon:"Quitter le salon", accueilBtn:"Accueil",
+  journalTitre:"Journal de la partie", langVers:"EN",
+  accSous:"Coups simultanés sur horloge réelle — choisis ton mode",
+  accIaCentral:"Jouer contre l’IA",
+  accIaCentralDesc:"Normal — tu joues Azur, l’IA programme en secret",
+  accHotseat:"Deux joueurs — même écran",
+  accHotseatDesc:"Chacun programme à son tour derrière l’écran de passage, puis les trois tics tombent ensemble.",
+  accIaFacile:"Jouer contre l’IA (Facile)",
+  accIaFacileDesc:"L’IA joue presque au hasard — pour commencer en douceur.",
+  accLigne:"En ligne — salon LOB7",
+  accLigneDesc:"Deux navigateurs, un salon lob7.com ; plus petit clientId = Azur, hôte-arbitre.",
+  lireRegles:"Lire les règles",
+  salonConnexion:"Connexion au salon LOB7…",
+  salonAttente:"Salon LOB7 — en attente de l’adversaire…",
+  salonFerme:"Le salon choisi n’accepte plus de messages.",
+  salonIndispo:"Salon LOB7 indisponible{code}.",
+  besoinLob7:"Le mode en ligne nécessite lob7.com.",
+  perduTitre:"CONNEXION PERDUE",
+  retourAccueil:"Retour à l’accueil",
+  perduDetail:"La liaison du salon a été coupée{code}. La partie en ligne s’arrête là — les modes « même écran » et « contre l’IA » restent disponibles depuis l’accueil.",
+  mesure:"MESURE {n}",
+  passeTitre:"Passe l’appareil à {nom}",
+  passeSous:"Les positions restent publiques.<br>Seul le programme que tu vas saisir est secret.",
+  passeBtn:"{nom} : programmer",
+  passeIaTitre:"À toi de jouer — {nom}",
+  passeIaSous:"Tu joues <b>Azur</b>. L’IA (<b>Corail</b>) programmera en secret après toi.",
+  passeIaBtn:"Azur : programmer",
+  finAzur:"AZUR L’EMPORTE", finCorail:"CORAIL L’EMPORTE", finEgalite:"ÉGALITÉ",
+  rejouer:"Rejouer", voirPlateau:"Voir le plateau", fermer:"Fermer",
+  raisonEgalite:"Les deux camps ont perdu toutes leurs pièces au même tic.",
+  raisonAzur:"Azur n’a plus aucune pièce.",
+  raisonCorail:"Corail n’a plus aucune pièce.",
+  raisonCentre:"{nom} a tenu le centre deux mesures de suite.",
+  raisonHote:"Fin de partie (verdict de l’hôte).",
+  hudAccueil:"Écran d’accueil",
+  hudAccueilDetail:"Choisis un mode : deux joueurs sur le même écran, contre l’IA, ou en ligne dans un salon LOB7.",
+  hudPasseIa:"À toi de jouer — {nom}",
+  hudPasseIaDetail:"Minuteur et écran inchangés ; l’IA programmera en secret après toi.",
+  hudPasse:"Passe l’appareil à {nom}",
+  hudPasseDetail:"Les positions sont publiques ; chaque joueur programme en secret.",
+  hudProg:"Programmation — {nom}{toi}",
+  toi:" (toi)",
+  hudProgDetail:"Une direction (ou « — ») par pièce et par tic. Saisie par la grille ou en cliquant autour de la pièce sélectionnée.",
+  hudProgDetailLigne:"Une direction (ou « — ») par pièce et par tic. L’adversaire programme en parallèle sur son écran — son programme t’est caché jusqu’à la résolution.",
+  enAttente:"En attente…",
+  hudAttenteIaDetail:"Le programme de l’IA (Corail) n’est jamais affiché avant la résolution.",
+  hudAttenteLigneDetail:"Les trois tics seront résolus par l’hôte (Azur), puis rejoués à l’identique sur les deux écrans.",
+  hudResolution:"Résolution — tic {n}/3",
+  hudResolutionDetail:"Les pas de chaque tic sont simultanés.",
+  emporte:"{nom} l’emporte", egaliteCourt:"Égalité", partieTerminee:"Partie terminée",
+  mesureLbl:"Mesure {n}", timerLbl:"Minuteur :",
+  tic:"Tic {n}", metronomeLbl:"Métronome {n}",
+  rester:"Rester sur place", valider:"Valider le programme",
+  aideProg:"Cellules « · » non saisies = « rester » à l’expiration du temps. Clique une case voisine sur le plateau pour programmer directement.",
+  programmeLbl:"Programme {nom}",
+  dirs:["E","NE","NO","O","SO","SE"],
+  et:" et ",
+  diffFacile:"facile", diffNormal:"normal",
+  jNouvelle:"Nouvelle partie — {azur} programme en premier.",
+  jIa:"Partie contre l’IA ({diff}) — tu joues {azur}.",
+  jLigne:"Salon LOB7 — élection : plus petit clientId = {azur} (hôte-arbitre). Tu es {toi}.",
+  jTemps:"Temps écoulé — les ordres non saisis de {nom} deviennent « rester ».",
+  jValide:"{nom} a validé son programme.",
+  attenteIa:"L’IA programme…",
+  jIaProgramme:"{corail} (IA) a programmé en secret.",
+  jResMesure:"Mesure {n} — résolution.",
+  jMur:function(v){ return v.noms + (v.nb > 1 ? " rebondissent : sortie de plateau." : " rebondit : sortie de plateau."); },
+  jOccupee:function(v){ return v.noms + (v.nb > 1 ? " rebondissent : case occupée par " : " rebondit : case occupée par ") + v.par + "."; },
+  jSwap:"Échange croisé : {noms} rebondissent.",
+  jAllie:"Collision alliée : {noms} rebondissent.",
+  jDuel:function(v){ return '<span class="j-or">Duel</span> en (' + v.q + ', ' + v.r + ') : ' + v.noms + ' élimin' + (v.nb > 1 ? 'és' : 'é') + '.'; },
+  jFinMesure:"Fin de mesure : {nom} tient le centre ({n}/2).",
+  jFinMesureZero:"Fin de mesure : centre non tenu par un joueur unique — compteurs remis à zéro.",
+  attenteEnvoye:"Programme envoyé — en attente de la résolution de l’hôte (Azur)…",
+  attenteRecu:"Programme de Corail reçu — résolution…",
+  attenteCorail:"En attente du programme de Corail…",
+  jMesureLigne:"Mesure {n} — programme {nom} (toi) ; l’adversaire programme en parallèle, en secret.",
+  jEnvoiProgramme:"Programme de Corail envoyé à l’hôte (Azur).",
+  jRecuProgramme:"Programme de Corail reçu — l’hôte résout la mesure.",
+  jHoteResout:"Mesure {n} résolue par l’hôte — diffusion aux deux écrans.",
+  jRejeu:"Résolution de l’hôte reçue (mesure {n}) — rejeu des tics.",
+  jAlerteSalon:"Salon : alerte passagère ({code}) — reprise automatique.",
+  jConnexionPerdue:"Connexion perdue{code} — retour à l’accueil.",
+  reglesHtml:`<h2>RÈGLES</h2>
+<div class="sur">Métronome — coups simultanés sur horloge réelle</div>
+<h3>Le plateau</h3>
+<p>Un hexagone de <b>19 cases</b> (rayon 2) en coordonnées axiales. Chaque joueur commande
+<b>3 métronomes</b> identiques : Azur au sud (rangée r&nbsp;=&nbsp;+2), Corail au nord (r&nbsp;=&nbsp;−2), en miroir.</p>
+<h3>Le but — deux façons de gagner</h3>
+<ul>
+  <li><b>Élimination</b> : réduire l’adversaire à zéro pièce (vérifié après chaque tic).</li>
+  <li><b>Le centre</b> : à la fin d’une mesure, si un <b>seul</b> joueur occupe le centre (0,0),
+  son compteur « centre » s’incrémente ; sinon les deux compteurs retombent à zéro.
+  <b>Deux mesures consécutives</b> de tenue du centre = victoire.</li>
+</ul>
+<h3>Une mesure</h3>
+<p>1) <b>Programmation d’Azur</b> (secrète, derrière l’écran « Passe l’appareil ») ;
+2) <b>Programmation de Corail</b> (secrète) ; 3) <b>Résolution</b> : 3 tics joués l’un après l’autre,
+chaque tic étant <b>totalement simultané</b>.</p>
+<h3>Programmation</h3>
+<p>Pour chacun des 3 tics, chacune de tes pièces vivantes reçoit <b>une direction parmi 6</b>
+ou <b>« — »</b> (rester) : une pièce franchit au plus une case par tic.
+Saisie par la grille (lignes = pièces, colonnes = tics) ou en cliquant les cases voisines sur le plateau.
+<b>Minuteur</b> par phase (15 / 30 / 60 s) : à 0, les ordres non saisis deviennent « rester ».
+Le bouton <b>Valider</b> clôt la phase avant la fin du temps (les non-saisis comptent alors pour « rester »).</p>
+<h3>Résolution d’un tic (pas simultanés)</h3>
+<ul>
+  <li>Sortie de plateau, ou case occupée par une pièce qui <b>ne la libère pas</b> ce tic → <b>rebond</b> (la pièce reste).</li>
+  <li>Deux pièces <b>ennemies</b> vers la même case libre → <b>duel</b> : les deux sont éliminées.
+  (Trois pièces ou plus de camps opposés vers la même case : toutes éliminées ; même camp : rebond.)</li>
+  <li>Deux pièces <b>alliées</b> vers la même case → toutes deux rebondissent.</li>
+  <li><b>Échange croisé</b> (A vers la case de B pendant que B va vers celle de A) → les deux rebondissent.</li>
+  <li>Une case <b>libérée</b> ce tic est immédiatement occupable — chaînes incluses
+  (A libère pour B qui libère pour C…).</li>
+  <li>Un joueur à zéro pièce en cours de mesure → fin immédiate. Les deux à zéro au même tic → <b>égalité</b>.</li>
+</ul>
+<p>Le compteur de centre est affiché en permanence en haut de l’écran.</p>
+<h3>Contre l’IA</h3>
+<p>Tu joues <b>Azur</b>, l’IA joue <b>Corail</b>. Ta phase de programmation est inchangée
+(minuteur + écran de saisie) ; l’IA programme ensuite en secret — son programme n’est
+<b>jamais affiché avant la résolution</b>. En <b>Normal</b>, elle progresse vers le centre et vers
+tes pièces proches, évite les duels évidents (ne pas viser une case adjacente à deux ennemis,
+ne pas doubler deux alliés vers la même case) et cherche à tenir le centre en fin de mesure,
+avec un léger bruit dans ses choix. En <b>Facile</b>, elle joue presque au hasard
+(directions valides uniquement).</p>
+<h3>En ligne — salon LOB7</h3>
+<p>Deux navigateurs rejoignent le même salon sur <b>lob7.com</b>, puis chacun programme
+<b>secrètement sur son écran</b> (pas d’écran de passage : tu ne vois jamais le programme
+de l’adversaire avant la résolution). À la validation — ou à l’expiration du minuteur —
+<b>Corail envoie son programme</b> ; dès que les deux programmes sont connus, <b>Azur
+(hôte-arbitre)</b> résout les trois tics avec le moteur du jeu et diffuse le résultat,
+rejoué à l’identique sur les deux écrans. La victoire est calculée par l’hôte.
+<b>Note honnête :</b> l’hôte-arbitre reçoit le programme de Corail au moment de la
+résolution — un hôte curieux pourrait techniquement le lire avant de lancer l’animation.
+Une déconnexion met fin à la partie (retour à l’accueil).</p>
+<div class="impossible">Pourquoi impossible avant l’informatique : programmation secrète simultanée et horloge partagée</div>`
+}
+};
+let LANG = "en";
+try{
+  const stockee = sessionStorage.getItem("metronome-lang");
+  if(stockee === "fr" || stockee === "en") LANG = stockee;
+}catch(e){ /* file:// : silencieux */ }
+function T(cle, vars){
+  const table = STR[LANG] || STR.en;
+  let v = Object.prototype.hasOwnProperty.call(table, cle) ? table[cle] : STR.en[cle];
+  if(typeof v === "function") v = v(vars || {});
+  if(typeof v !== "string") return v; /* tableaux (dirs…) renvoyés tels quels */
+  if(vars) for(const k in vars) v = v.split("{" + k + "}").join(String(vars[k]));
+  return v;
+}
+function nomSpan(j){ return '<span class="j-' + j + '">' + NOM_JOUEUR[j] + "</span>"; }
+/* Textes de l’écran de passage pour le mode IA (l’humain garde l’écran et le minuteur). */
+function textesPasseIa(){
+  return { titre:T("passeIaTitre", { nom:NOM_JOUEUR.azur }), sous:T("passeIaSous"), btn:T("passeIaBtn") };
+}
+/* Applique la langue courante à tous les textes statiques + zones dynamiques. */
+function appliquerLangue(){
+  document.documentElement.setAttribute("lang", LANG);
+  document.title = T("titre");
+  document.querySelectorAll("[data-i18n]").forEach(function(el){ el.textContent = T(el.getAttribute("data-i18n")); });
+  document.querySelectorAll("[data-i18n-html]").forEach(function(el){ el.innerHTML = T(el.getAttribute("data-i18n-html")); });
+  document.querySelectorAll("[data-i18n-title]").forEach(function(el){ el.title = T(el.getAttribute("data-i18n-title")); });
+  const rc = document.getElementById("regles-contenu");
+  if(rc) rc.innerHTML = T("reglesHtml");
+  const bl = document.getElementById("btn-lang");
+  if(bl) bl.textContent = T("langVers");
+  const nb = document.getElementById("btn-nouvelle");
+  if(nb && !nb.classList.contains("confirm")) nb.textContent = T("nouvellePartie");
+  if(G.ecran === "passe") montrerPasse(G.passeJoueur, G.mode === "ia" ? textesPasseIa() : null);
+  if(G.ecran === "fin") majFinTextes();
+  majUI();
+}
+function majFinTextes(){
+  const v = G.vainqueur;
+  if(!v) return;
+  const t = v.joueur === "azur" ? T("finAzur") : (v.joueur === "corail" ? T("finCorail") : T("finEgalite"));
+  const cls = v.joueur === "azur" ? "vainqueur-azur" : (v.joueur === "corail" ? "vainqueur-corail" : "vainqueur-egalite");
+  const elT = document.getElementById("fin-titre");
+  elT.textContent = t; elT.className = cls; elT.style.letterSpacing = ".22em"; elT.style.fontSize = "20px";
+  document.getElementById("fin-raison").textContent = v.raison;
+}
+/* Démarrage direct d’une partie IA depuis l’accueil (bouton central) :
+   pas d’écran de passage — saisie immédiate (« Your turn to program »). */
+function demarrerIaDirect(difficulte){
+  nouvellePartie("ia", { difficulte:difficulte === "facile" ? "facile" : "normal" });
+  document.getElementById("overlay-passe").classList.add("cache");
+  commencerProg();
+}
+
+/* ---------- Chargement dynamique optionnel des assets ----------
+   Si assets/manifest.js existe (produit par un autre agent), il définit
+   window.ASSETS_MANIFEST. Sinon : rendu 100 % procédural. */
+(function chargerManifest(){
+  try{
+    const s = document.createElement("script");
+    s.src = "assets/manifest.js";
+    s.onerror = function(){ /* absent : mode procédural, silencieux */ };
+    document.head.appendChild(s);
+  }catch(e){ /* file:// sans dossier assets */ }
+})();
+
+/* ---------- Couche assets : asset(id, minPx) -> Image|null ---------- */
+const ASSET = (function(){
+  const cache = new Map(); // clé "id|fichier" -> {img, pret, echec}
+  function entrante(id){
+    const m = window.ASSETS_MANIFEST;
+    if(!m || !Array.isArray(m.assets)) return null;
+    for(const e of m.assets) if(e && e.id === id) return e;
+    return null;
+  }
+  function asset(id, minPx){
+    const e = entrante(id);
+    if(!e) return null;
+    let fichier = null;
+    if(e.format === "png" && Array.isArray(e.variants) && e.variants.length){
+      let meilleure = null;
+      for(const v of e.variants){
+        if(v && v.px >= minPx && (!meilleure || v.px < meilleure.px)) meilleure = v;
+      }
+      if(!meilleure){
+        for(const v of e.variants) if(v && (!meilleure || v.px > meilleure.px)) meilleure = v;
+      }
+      fichier = meilleure && meilleure.file;
+    }else if(e.file){
+      fichier = e.file; // SVG : vectoriel, toute taille
+    }
+    if(!fichier) return null;
+    const cle = id + "|" + fichier;
+    let rec = cache.get(cle);
+    if(!rec){
+      const img = new Image();
+      rec = { img:img, pret:false, echec:false };
+      img.onload = function(){ rec.pret = true; };   // le rAF réaffichera l’image
+      img.onerror = function(){ rec.echec = true; }; // fichier manquant -> procédural
+      img.src = "assets/" + fichier;
+      cache.set(cle, rec);
+    }
+    return (rec.pret && !rec.echec) ? rec.img : null;
+  }
+  return { asset:asset };
+})();
+function asset(id, minPx){ return ASSET.asset(id, minPx || 64); }
+
+/* ============================================================
+   CORE — logique pure (aucune dépendance DOM), testable sous node.
+   ============================================================ */
+// ==CORE==
+const CORE = (function(){
+  "use strict";
+  const RAYON = 2;
+  /* 6 directions axiales d’une grille pointue (pointy-top).
+     Ordre : E, NE, NW, W, SW, SE. */
+  const DIRS = [
+    { q: 1, r: 0 },  // E
+    { q: 1, r:-1 },  // NE
+    { q: 0, r:-1 },  // NW
+    { q:-1, r: 0 },  // W
+    { q:-1, r: 1 },  // SW
+    { q: 0, r: 1 }   // SE
+  ];
+  function casesPlateau(){
+    const out = [];
+    for(let q = -RAYON; q <= RAYON; q++){
+      const rmin = Math.max(-RAYON, -q - RAYON), rmax = Math.min(RAYON, -q + RAYON);
+      for(let r = rmin; r <= rmax; r++) out.push({ q:q, r:r });
+    }
+    return out;
+  }
+  function dansPlateau(q, r){
+    return Math.abs(q) <= RAYON && Math.abs(r) <= RAYON && Math.abs(q + r) <= RAYON;
+  }
+  function memeCase(a, b){ return a.q === b.q && a.r === b.r; }
+
+  /* Résolution d’UN tic, tous les pas simultanés.
+     pieces : [{id, joueur, q, r}] (vivantes au début du tic)
+     ordres : { id -> dir (0..5) | -1 (rester) }  (manquant = rester)
+     Retour : { mouvs:[{id, joueur, from, to, dir, etat, cause}],
+                evts:[{type, ids, case?, par?, dir?}] }
+     etat final : "reste" | "ok" (déplacement effectif) | "rebond" | "mort".
+     Algorithme : itérations jusqu’à point fixe (chaque règle peut
+     invalider d’autres mouvements : chaînes, cascades de rebonds). */
+  function resoudreTic(pieces, ordres){
+    const M = pieces.map(function(p){
+      const d = (ordres && Object.prototype.hasOwnProperty.call(ordres, p.id)) ? ordres[p.id] : -1;
+      const dir = (typeof d === "number" && d >= 0 && d < 6) ? DIRS[d] : null;
+      const to = dir ? { q:p.q + dir.q, r:p.r + dir.r } : { q:p.q, r:p.r };
+      return {
+        id:p.id, joueur:p.joueur,
+        from:{ q:p.q, r:p.r }, to:to, dir: dir ? d : -1,
+        etat: dir ? "ok" : "reste", cause:null, bloqueur:null
+      };
+    });
+    const evts = [];
+    let changement = true;
+    while(changement){
+      changement = false;
+      /* 1) Sortie de plateau -> rebond. */
+      for(const m of M){
+        if(m.etat !== "ok") continue;
+        if(!dansPlateau(m.to.q, m.to.r)){
+          m.etat = "rebond"; m.cause = "mur"; m.to = { q:m.from.q, r:m.from.r };
+          evts.push({ type:"mur", ids:[m.id], dir:m.dir });
+          changement = true;
+        }
+      }
+      /* 2) Échange croisé A<->B -> les deux rebondissent. */
+      for(let i = 0; i < M.length; i++) for(let j = i + 1; j < M.length; j++){
+        const a = M[i], b = M[j];
+        if(a.etat === "ok" && b.etat === "ok" &&
+           memeCase(a.to, b.from) && memeCase(b.to, a.from)){
+          a.etat = b.etat = "rebond"; a.cause = b.cause = "swap";
+          a.to = { q:a.from.q, r:a.from.r }; b.to = { q:b.from.q, r:b.from.r };
+          evts.push({ type:"swap", ids:[a.id, b.id] });
+          changement = true;
+        }
+      }
+      /* 3) Case occupée par une pièce qui ne la libère pas -> rebond.
+         (libère = état "ok" : elle quitte effectivement sa case ce tic ;
+          une pièce morte ne bloque pas : elle a quitté sa case) */
+      for(const m of M){
+        if(m.etat !== "ok") continue;
+        for(const z of M){
+          if(z === m || z.etat === "ok" || z.etat === "mort") continue; // z reste sur place
+          if(memeCase(z.to, m.to)){
+            m.etat = "rebond"; m.cause = "occupee"; m.bloqueur = z.id;
+            m.to = { q:m.from.q, r:m.from.r };
+            evts.push({ type:"occupee", ids:[m.id], par:z.id });
+            changement = true;
+            break;
+          }
+        }
+      }
+      /* 4) Destinations communes (uniquement cases effectivement visées et libres). */
+      const groupes = new Map();
+      for(const m of M){
+        if(m.etat !== "ok" || memeCase(m.to, m.from)) continue;
+        const k = m.to.q + "," + m.to.r;
+        if(!groupes.has(k)) groupes.set(k, []);
+        groupes.get(k).push(m);
+      }
+      for(const g of groupes.values()){
+        if(g.length < 2) continue;
+        const camps = new Set(g.map(function(m){ return m.joueur; }));
+        if(camps.size === 1){
+          for(const m of g){
+            m.etat = "rebond"; m.cause = "allie"; m.to = { q:m.from.q, r:m.from.r };
+          }
+          evts.push({ type:"allie", ids:g.map(function(m){ return m.id; }), case:{ q:g[0].to.q, r:g[0].to.r } });
+        }else{
+          for(const m of g){ m.etat = "mort"; m.cause = "duel"; }
+          evts.push({ type:"duel", ids:g.map(function(m){ return m.id; }), case:{ q:g[0].to.q, r:g[0].to.r } });
+        }
+        changement = true;
+      }
+    }
+    return { mouvs:M, evts:evts };
+  }
+
+  /* Fin de mesure : qui tient le centre ? null si personne/contesté. */
+  function tenantDuCentre(pieces){
+    const sur = pieces.filter(function(p){ return p.q === 0 && p.r === 0; });
+    if(sur.length === 0) return null;
+    const j = sur[0].joueur;
+    for(const p of sur) if(p.joueur !== j) return null;
+    return j;
+  }
+
+  return { RAYON:RAYON, DIRS:DIRS, casesPlateau:casesPlateau, dansPlateau:dansPlateau, resoudreTic:resoudreTic, tenantDuCentre:tenantDuCentre };
+})();
+// ==/CORE==
+
+/* ---------- Constantes d’affichage ---------- */
+const COUL = { azur:"#1f6feb", corail:"#d1495b", or:"#d1495b", fond:"#efe6d4",
+               encre:"#2b2620", ivoire:"#f7f0e2", bois:"#8a5a3b", vermillon:"#d1495b" };
+const NOM_JOUEUR = { azur:"Azur", corail:"Corail" };
+/* Angle (degrés, repère écran, y vers le bas) de chaque direction. */
+const ANGLE_DIR = [0, -60, -120, 180, 120, 60];
+const DUREES_TIMER = [
+  { ms:15000, lbl:"15 s" }, { ms:30000, lbl:"30 s" }, { ms:60000, lbl:"60 s" }
+];
+const CASES = CORE.casesPlateau();
+
+/* ---------- État global (pur, séparé du rendu) ---------- */
+const G = {
+  partieId:0,          // jeton : invalide les timeouts obsolètes
+  ecran:"accueil",     // accueil | passe | prog | attente | resolution | fin
+  mode:null,           // null | "hotseat" | "ia" | "ligne"
+  difficulte:"normal", // mode ia : "facile" | "normal"
+  ligne:null,          // mode en ligne : {conn, clientId, moi, adverse, partie, propre, recu, finRecue, stopSub}
+  attente:null,        // écran d’attente : {key, vars} pour T()
+  rejouer:null,        // rejeu d’une mesure résolue par l’hôte (mode en ligne)
+  passeJoueur:"azur",   // joueur attendu à l’écran de passe
+  joueurActif:null,     // joueur qui programme
+  mesure:1,
+  pieces:[],            // pièces vivantes [{id, joueur, q, r}]
+  ordres:{ azur:{}, corail:{} },  // { id: [d0,d1,d2] } avec d = 0..5 | -1 | null(non saisi)
+  saisie:{ id:null, tic:0 },      // cellule sélectionnée dans la grille
+  compteurs:{ azur:0, corail:0 }, // tenues consécutives du centre
+  timer:{ duree:30000, reste:30000, actif:false, derniere:0 },
+  journal:[],
+  anim:null,            // animation du tic en cours
+  resTic:0,             // index du tic en résolution
+  vainqueur:null,       // {joueur|null, raison}
+  reglesOuvertes:false,
+  hoverHex:null,
+  finVisible:false      // overlay fin refermé par « Voir le plateau »
+};
+function piecesDe(j){ return G.pieces.filter(function(p){ return p.joueur === j; }); }
+
+function positionsInitiales(){
+  return [
+    { id:"A1", joueur:"azur",  q:-2, r:2 }, { id:"A2", joueur:"azur",  q:-1, r:2 }, { id:"A3", joueur:"azur",  q:0, r:2 },
+    { id:"C1", joueur:"corail", q:0, r:-2 }, { id:"C2", joueur:"corail", q:1, r:-2 }, { id:"C3", joueur:"corail", q:2, r:-2 }
+  ];
+}
+/* Textes de l’écran de passage pour le mode IA : textesPasseIa() (i18n). */
+function nouvellePartie(mode, opts){
+  opts = opts || {};
+  mode = mode || "hotseat";
+  if(mode !== "ligne") quitterLigne();
+  G.partieId++;
+  G.mode = mode;
+  G.difficulte = opts.difficulte || G.difficulte || "normal";
+  G.joueurActif = null;
+  G.mesure = 1;
+  G.pieces = positionsInitiales();
+  G.ordres = { azur:{}, corail:{} };
+  G.saisie = { id:null, tic:0 };
+  G.compteurs = { azur:0, corail:0 };
+  G.timer = { duree:G.timer.duree, reste:G.timer.duree, actif:false, derniere:0 };
+  G.journal = [];
+  G.anim = null; G.resTic = 0; G.vainqueur = null; G.finVisible = false;
+  G.attente = null; G.rejouer = null;
+  for(const id of ["overlay-accueil","overlay-salon","overlay-perdu","overlay-fin","overlay-regles"]) document.getElementById(id).classList.add("cache");
+  G.reglesOuvertes = false;
+  if(mode === "hotseat"){
+    ajouterJournal(T("jNouvelle", { azur:nomSpan("azur") }), 0, 0);
+    montrerPasse("azur");
+  }else if(mode === "ia"){
+    ajouterJournal(T("jIa", { diff:T(G.difficulte === "facile" ? "diffFacile" : "diffNormal"), azur:nomSpan("azur") }), 0, 0);
+    montrerPasse("azur", textesPasseIa());
+  }else if(mode === "ligne"){
+    const L = G.ligne;
+    ajouterJournal(T("jLigne", { azur:nomSpan("azur"), toi:nomSpan(L.moi) }), 0, 0);
+    commencerMesureLigne();
+  }
+  majHeader();
+  majUI();
+}
+/* ---------- Accueil / navigation entre modes ---------- */
+function statutAccueil(txt){ document.getElementById("acc-statut").textContent = txt || ""; }
+function majHeader(){
+  const accueil = G.ecran === "accueil";
+  document.getElementById("btn-nouvelle").hidden = accueil || !G.mode || G.mode === "ligne";
+  document.getElementById("btn-accueil").hidden = accueil;
+  document.getElementById("btn-quitter-salon").hidden = (G.mode !== "ligne");
+}
+function retourAccueil(){
+  G.partieId++;
+  arreterTimer();
+  quitterLigne();
+  G.mode = null; G.ligne = null;
+  G.ecran = "accueil";
+  G.joueurActif = null;
+  G.mesure = 1;
+  G.pieces = positionsInitiales();
+  G.ordres = { azur:{}, corail:{} };
+  G.saisie = { id:null, tic:0 };
+  G.compteurs = { azur:0, corail:0 };
+  G.timer = { duree:G.timer.duree, reste:G.timer.duree, actif:false, derniere:0 };
+  G.journal = [];
+  G.anim = null; G.resTic = 0; G.vainqueur = null; G.finVisible = false;
+  G.attente = null; G.rejouer = null; G.reglesOuvertes = false;
+  for(const id of ["overlay-passe","overlay-fin","overlay-salon","overlay-regles","overlay-perdu"]) document.getElementById(id).classList.add("cache");
+  document.getElementById("overlay-accueil").classList.remove("cache");
+  statutAccueil("");
+  majHeader();
+  majUI();
+}
+
+/* ---------- Planificateur avec jeton (timeouts sûrs) ---------- */
+function plusTard(ms, fn){
+  const jeton = G.partieId;
+  setTimeout(function(){ if(jeton === G.partieId) fn(); }, ms);
+}
+
+/* ---------- Minuteur ---------- */
+function demarrerTimer(){
+  G.timer.reste = G.timer.duree;
+  G.timer.actif = true;
+  G.timer.derniere = performance.now();
+}
+function arreterTimer(){ G.timer.actif = false; }
+function pauseTimer(){ if(G.timer.actif) G.timer.actif = "pause"; }
+function repriseTimer(){ if(G.timer.actif === "pause"){ G.timer.actif = true; G.timer.derniere = performance.now(); } }
+function majTimer(now){
+  if(G.timer.actif !== true) { G.timer.derniere = now; return; }
+  const dt = now - G.timer.derniere;
+  G.timer.derniere = now;
+  G.timer.reste -= dt;
+  if(G.timer.reste <= 0){
+    G.timer.reste = 0; G.timer.actif = false;
+    expirerTimer();
+  }
+}
+function changerDuree(ms){
+  G.timer.duree = ms;
+  if(G.timer.actif === true){
+    G.timer.reste = Math.min(G.timer.reste, ms);
+    G.timer.derniere = performance.now();
+  }
+}
+function expirerTimer(){
+  if(G.ecran !== "prog") return;
+  const j = G.joueurActif;
+  ajouterJournal(T("jTemps", { nom:nomSpan(j) }), G.mesure, 0);
+  validerProgrammation(true);
+}
+
+/* ---------- Machine à états : phases ---------- */
+function montrerPasse(joueur, textes){
+  arreterTimer();
+  G.ecran = "passe"; G.passeJoueur = joueur;
+  const el = document.getElementById("passe-mesure");
+  el.textContent = T("mesure", { n:G.mesure });
+  const t = document.getElementById("passe-titre");
+  t.textContent = (textes && textes.titre) || T("passeTitre", { nom:NOM_JOUEUR[joueur] });
+  t.className = "gros-passe j-" + joueur;
+  document.getElementById("passe-sous").innerHTML = (textes && textes.sous) || T("passeSous");
+  const b = document.getElementById("btn-commencer-prog");
+  b.textContent = (textes && textes.btn) || T("passeBtn", { nom:NOM_JOUEUR[joueur] });
+  b.className = "primaire";
+  b.style.borderColor = joueur === "azur" ? COUL.azur : COUL.corail;
+  document.getElementById("overlay-passe").classList.remove("cache");
+  document.getElementById("overlay-fin").classList.add("cache");
+}
+function commencerProg(){
+  document.getElementById("overlay-passe").classList.add("cache");
+  G.ecran = "prog";
+  G.joueurActif = G.passeJoueur;
+  const j = G.joueurActif;
+  const ords = {};
+  for(const p of piecesDe(j)) ords[p.id] = [null, null, null];
+  G.ordres[j] = ords;
+  const vivantes = piecesDe(j);
+  G.saisie = vivantes.length ? { id:vivantes[0].id, tic:0 } : { id:null, tic:0 };
+  demarrerTimer();
+  majUI();
+}
+/* Écran d’attente : IA qui programme, ou adversaire/hôte en ligne. Pas de saisie. */
+function montrerAttente(cle, vars){
+  G.ecran = "attente"; G.attente = { key:cle, vars:vars };
+  document.getElementById("overlay-passe").classList.add("cache");
+}
+function validerProgrammation(auto){
+  if(G.ecran !== "prog") return;
+  arreterTimer();
+  const j = G.joueurActif;
+  for(const id in G.ordres[j]){
+    for(let t = 0; t < 3; t++){
+      if(G.ordres[j][id][t] === null || G.ordres[j][id][t] === undefined) G.ordres[j][id][t] = -1;
+    }
+  }
+  if(!auto) ajouterJournal(T("jValide", { nom:nomSpan(j) }), G.mesure, 0);
+  if(G.mode === "hotseat"){
+    if(j === "azur"){
+      montrerPasse("corail"); // écran OBLIGATOIRE entre les deux programmations
+    }else{
+      commencerResolution();
+    }
+  }else if(G.mode === "ia"){
+    /* Joueur humain (Azur) validé : l’IA programme en secret ~1 s, puis résolution normale. */
+    montrerAttente("attenteIa");
+    const delai = 900 + Math.floor(Math.random() * 500);
+    plusTard(delai, function(){
+      if(G.ecran !== "attente" || G.mode !== "ia") return;
+      iaProgrammer();
+      ajouterJournal(T("jIaProgramme", { corail:nomSpan("corail") }), G.mesure, 0);
+      commencerResolution();
+      majUI();
+    });
+  }else if(G.mode === "ligne"){
+    const L = G.ligne;
+    L.proprie = true;
+    if(L.moi === "corail"){
+      envoyerProgrammeLigne();
+      montrerAttente("attenteEnvoye");
+    }else{
+      montrerAttente(L.recu ? "attenteRecu" : "attenteCorail");
+      ligneVerifierPret();
+    }
+  }
+  majUI();
+}
+function commencerResolution(){
+  G.ecran = "resolution";
+  G.resTic = 0;
+  ajouterJournal("<span class=\u0022j-or\u0022>" + T("jResMesure", { n:G.mesure }) + "</span>", G.mesure, 0);
+  lancerTic(0);
+  majUI();
+}
+function ordresDuTic(joueur, tic){
+  const o = {};
+  for(const p of G.pieces){ // pièces vivantes uniquement
+    if(p.joueur !== joueur) continue;
+    const d = (G.ordres[joueur] && G.ordres[joueur][p.id]) ? G.ordres[joueur][p.id][tic] : -1;
+    o[p.id] = (d === null || d === undefined) ? -1 : d;
+  }
+  return o;
+}
+function lancerTic(tic){
+  let res = null;
+  if(G.rejouer && G.rejouer.tics[tic]){
+    /* Mode en ligne : rejeu de la résolution calculée par l’hôte. */
+    res = { mouvs:G.rejouer.tics[tic].mouvs, evts:G.rejouer.tics[tic].evts };
+  }
+  if(!res) res = CORE.resoudreTic(G.pieces, Object.assign({}, ordresDuTic("azur", tic), ordresDuTic("corail", tic)));
+  G.anim = { tic:tic, mouvs:res.mouvs, evts:res.evts, debut:performance.now(), duree:650 };
+  G.resTic = tic;
+}
+function nomPiece(id){
+  const j = id[0] === "A" ? "azur" : "corail";
+  return "<span class=\u0022j-" + j + "\u0022>" + NOM_JOUEUR[j] + " " + id.slice(1) + "</span>";
+}
+function appliquerTic(){
+  const anim = G.anim;
+  G.anim = null;
+  if(!anim) return;
+  for(const m of anim.mouvs){
+    const p = G.pieces.find(function(x){ return x.id === m.id; });
+    if(!p) continue;
+    if(m.etat === "mort"){
+      const i = G.pieces.indexOf(p);
+      if(i >= 0) G.pieces.splice(i, 1);
+    }else if(m.etat === "ok"){
+      p.q = m.to.q; p.r = m.to.r;
+    }
+  }
+  for(const e of anim.evts){
+    const noms = e.ids.map(nomPiece).join(T("et"));
+    let txt = "";
+    if(e.type === "mur") txt = T("jMur", { noms:noms, nb:e.ids.length });
+    else if(e.type === "occupee") txt = T("jOccupee", { noms:noms, nb:e.ids.length, par:nomPiece(e.par) });
+    else if(e.type === "swap") txt = T("jSwap", { noms:noms });
+    else if(e.type === "allie") txt = T("jAllie", { noms:noms });
+    else if(e.type === "duel") txt = T("jDuel", { q:e.case.q, r:e.case.r, noms:noms, nb:e.ids.length });
+    ajouterJournal(txt, G.mesure, anim.tic + 1);
+  }
+  /* Victoire par élimination : après CHAQUE tic (modes locaux hotseat/ia). */
+  if(!G.rejouer){
+    const na = piecesDe("azur").length, nc = piecesDe("corail").length;
+    if(na === 0 && nc === 0){ finPartie(null, T("raisonEgalite")); return; }
+    if(na === 0){ finPartie("corail", T("raisonAzur")); return; }
+    if(nc === 0){ finPartie("azur", T("raisonCorail")); return; }
+    if(anim.tic < 2){
+      plusTard(160, function(){ lancerTic(anim.tic + 1); });
+    }else{
+      finDeMesure();
+    }
+  }else{
+    /* Mode en ligne : l’hôte a déjà tout arbitré — on rejoue ses tics puis on clôt. */
+    if(anim.tic < G.rejouer.nbTics - 1){
+      plusTard(160, function(){ lancerTic(anim.tic + 1); });
+    }else{
+      finDeMesureRejouee();
+    }
+  }
+}
+function finDeMesure(){
+  const tenant = CORE.tenantDuCentre(G.pieces);
+  if(tenant){
+    G.compteurs[tenant]++;
+    ajouterJournal(T("jFinMesure", { nom:nomSpan(tenant), n:G.compteurs[tenant] }), G.mesure, 3);
+    if(G.compteurs[tenant] >= 2){
+      finPartie(tenant, T("raisonCentre", { nom:NOM_JOUEUR[tenant] }));
+      return;
+    }
+  }else{
+    if(G.compteurs.azur || G.compteurs.corail){
+      ajouterJournal(T("jFinMesureZero"), G.mesure, 3);
+    }
+    G.compteurs.azur = 0; G.compteurs.corail = 0;
+  }
+  G.mesure++;
+  majUI();
+  plusTard(700, function(){
+    if(G.mode === "ia") montrerPasse("azur", textesPasseIa());
+    else montrerPasse("azur");
+    majUI();
+  });
+}
+/* ---------- Fin de mesure en mode en ligne : verdict de l’hôte ---------- */
+function finDeMesureRejouee(){
+  const r = G.rejouer;
+  G.rejouer = null;
+  if(!r) return;
+  /* Snap sur la vérité de l’hôte (plateau final + compteurs de centre). */
+  if(Array.isArray(r.plateauFinal) && r.plateauFinal.length){
+    G.pieces = r.plateauFinal.map(function(p){
+      return { id:String(p.id), joueur:(p.joueur === "azur" ? "azur" : "corail"), q:p.q | 0, r:p.r | 0 };
+    });
+  }
+  G.compteurs = { azur:r.compteurs.azur | 0, corail:r.compteurs.corail | 0 };
+  if(r.terminee){ finPartie(r.vainqueur, r.raison || T("raisonHote")); return; }
+  const tenant = CORE.tenantDuCentre(G.pieces);
+  if(tenant && G.compteurs[tenant] > 0){
+    ajouterJournal(T("jFinMesure", { nom:nomSpan(tenant), n:G.compteurs[tenant] }), G.mesure, 3);
+  }
+  G.mesure = r.numero + 1;
+  majUI();
+  plusTard(700, function(){ commencerMesureLigne(); majUI(); });
+}
+function finPartie(vainqueur, raison){
+  arreterTimer();
+  G.ecran = "fin";
+  G.vainqueur = { joueur:vainqueur, raison:raison };
+  majFinTextes();
+  const t = document.getElementById("fin-titre").textContent;
+  ajouterJournal("<span class=\u0022j-or\u0022>" + t + "</span> — " + raison, G.mesure, 3);
+  plusTard(650, function(){
+    if(G.ecran !== "fin") return;
+    document.getElementById("overlay-fin").classList.remove("cache");
+    document.getElementById("overlay-passe").classList.add("cache");
+    G.finVisible = true;
+  });
+  /* Boutons de fin selon le mode : pas de « Rejouer » en ligne (partie arbitrée par l’hôte). */
+  document.getElementById("btn-rejouer").hidden = (G.mode === "ligne");
+  document.getElementById("btn-fin-accueil").hidden = !(G.mode === "ligne" || G.mode === "ia");
+  majUI();
+}
+
+/* ============================================================
+   IA — Corail programme en secret (mode « Contre l’IA »).
+   Facile : quasi aléatoire (directions valides).
+   Normal : scorer chaque direction — progresser vers le centre et
+   vers les pièces adverses proches, éviter les duels évidents
+   (case visée adjacente à deux ennemis, deux alliés vers la même
+   case), tenir le centre en fin de mesure, léger bruit.
+   ============================================================ */
+function distHex(q, r){ return (Math.abs(q) + Math.abs(r) + Math.abs(q + r)) / 2; }
+function distCases(a, b){ return distHex(a.q - b.q, a.r - b.r); }
+function dirPossible(q, r, d){
+  if(d < 0) return true;
+  const dir = CORE.DIRS[d];
+  return CORE.dansPlateau(q + dir.q, r + dir.r);
+}
+function iaChoisirDirection(cur, ennemies, reservees, tic){
+  if(G.difficulte === "facile"){
+    /* Quasi aléatoire : rester de temps en temps, sinon direction valide uniforme. */
+    if(Math.random() < 0.15) return -1;
+    const valides = [];
+    for(let d = 0; d < 6; d++) if(dirPossible(cur.q, cur.r, d)) valides.push(d);
+    return valides.length ? valides[Math.floor(Math.random() * valides.length)] : -1;
+  }
+  const dCentreCur = distHex(cur.q, cur.r);
+  let dEnnCur = null;
+  for(const e of ennemies){ const de = distCases(cur, e); if(dEnnCur === null || de < dEnnCur) dEnnCur = de; }
+  const offres = [];
+  for(let d = -1; d < 6; d++){
+    if(!dirPossible(cur.q, cur.r, d)) continue;
+    const dest = d < 0 ? cur : { q:cur.q + CORE.DIRS[d].q, r:cur.r + CORE.DIRS[d].r };
+    let s = Math.random() * 1.0;                              // léger bruit permanent
+    if(d < 0){
+      s -= 1.2;                                               // légère préférence pour avancer
+      if(cur.q === 0 && cur.r === 0) s += 2.6;                // garder le centre si on y est
+    }else{
+      s += (dCentreCur - distHex(dest.q, dest.r)) * 2.2;      // progresser vers le centre
+      let dEnn = null;
+      for(const e of ennemies){ const de = distCases(dest, e); if(dEnn === null || de < dEnn) dEnn = de; }
+      if(dEnnCur !== null && dEnn !== null) s += (dEnnCur - dEnn) * 1.1; // approcher l’ennemi proche
+      const adj = ennemies.filter(function(e){ return distCases(dest, e) === 1; }).length;
+      if(adj >= 2) s -= 6;                                    // duel évident : ≥ 2 ennemis adjacents à la case visée
+      else if(adj === 1) s -= 0.8;                            // risque simple
+      if(reservees.has(dest.q + "," + dest.r)) s -= 5;        // deux alliés vers la même case
+      const occupant = G.pieces.find(function(p){ return p.q === dest.q && p.r === dest.r; });
+      if(occupant) s -= 0.7;                                  // case occupée : rebond probable
+      if(tic === 2 && dest.q === 0 && dest.r === 0) s += 3.5; // tenue du centre en fin de mesure
+    }
+    offres.push({ d:d, s:s });
+  }
+  offres.sort(function(a, b){ return b.s - a.s; });
+  if(offres.length > 1 && Math.random() < 0.15) return offres[1].d; // léger bruit : 2ᵉ choix
+  return offres.length ? offres[0].d : -1;
+}
+function iaProgrammer(){
+  const ords = {};
+  const ennemies = piecesDe("azur");
+  const projets = new Map();
+  for(const p of piecesDe("corail")) projets.set(p.id, { q:p.q, r:p.r });
+  const reservees = new Set();
+  for(let t = 0; t < 3; t++){
+    reservees.clear();
+    for(const p of piecesDe("corail")){
+      ords[p.id] = ords[p.id] || [null, null, null];
+      const cur = projets.get(p.id);
+      const d = iaChoisirDirection(cur, ennemies, reservees, t);
+      ords[p.id][t] = d;
+      if(d >= 0){
+        const dir = CORE.DIRS[d];
+        reservees.add((cur.q + dir.q) + "," + (cur.r + dir.r));
+        cur.q += dir.q; cur.r += dir.r;
+      }
+    }
+  }
+  G.ordres.corail = ords;
+}
+
+/* ============================================================
+   MODE EN LIGNE — salon LOB7 (SDK LOB7Rooms copié inline plus haut).
+   Protocole (send/subscribe du salon, ordre total par numéro de séquence) :
+     {type:"hello", clientId, epoch}            élection : plus petit clientId = Azur (hôte-arbitre)
+     {type:"programme", numero, cle, tics, partie}  Corail → hôte, à la validation (ou expiration)
+     {type:"resultat", numero, evenements, plateau, …} hôte → tous : rejeu de la mesure
+     {type:"fin", numero, vainqueur, raison}    hôte → tous : verdict final
+   Les numéros de mesure servent d’idempotence et d’ordre ; payloads bien < 8192 octets.
+   ============================================================ */
+function idAleatoire(){
+  const octets = new Uint8Array(8);
+  if(window.crypto && window.crypto.getRandomValues) window.crypto.getRandomValues(octets);
+  else for(let i = 0; i < 8; i++) octets[i] = Math.floor(Math.random() * 256);
+  let s = "";
+  for(let i = 0; i < 8; i++) s += (octets[i] < 16 ? "0" : "") + octets[i].toString(16);
+  return s;
+}
+const CODES_FATAUX_LIGNE = ["ROOM_CHANGED","ROOM_CONNECTION_CLOSED","ROOM_FRAME_RELOADED","ROOM_EXPIRED",
+  "ROOM_NOT_FOUND","RELEASE_NOT_FOUND","ACCOUNT_SUSPENDED","GAME_NOT_ALLOWED","SCOPE_REQUIRED",
+  "AUTH_INVALID","AUTH_REQUIRED"];
+function salonStatut(html){ const el = document.getElementById("salon-statut"); if(el) el.innerHTML = html; }
+
+function envoyerLigne(data, cle){
+  /* Envoi avec UNE relance (même clé d’idempotence, supportée par le SDK). */
+  const L = G.ligne;
+  if(!L || !L.conn) return Promise.resolve(null);
+  const opts = cle ? { idempotencyKey:cle } : undefined;
+  return L.conn.send(data, opts).catch(function(premier){
+    return new Promise(function(resolve){ setTimeout(resolve, 2500); })
+      .then(function(){ return L.conn.send(data, opts); })
+      .catch(function(){ throw premier; });
+  });
+}
+function connecterLigne(){
+  statutAccueil("");
+  const jeton = ++G.partieId; // invalide toute partie en cours / callbacks obsolètes
+  document.getElementById("overlay-accueil").classList.add("cache");
+  document.getElementById("overlay-salon").classList.remove("cache");
+    salonStatut('<span class="salon-point"></span>' + T("salonConnexion"));
+  LOB7Rooms.connect().then(function(conn){
+    if(jeton !== G.partieId) return;
+    if(conn.room && conn.room.status !== "open"){
+      salonStatut(T("salonFerme"));
+      return;
+    }
+    const L = {
+      conn:conn, clientId:idAleatoire(), moi:null, adverse:null, helloVu:false,
+      partie:null, propre:false, recu:null, finRecue:null, stopSub:null
+    };
+    G.ligne = L;
+    L.stopSub = conn.subscribe(
+      function(message){ traiterMessageLigne(message); },
+      { after:0, onError:function(err){ erreurAbonnementLigne(err); } }
+    );
+    envoyerLigne({ type:"hello", clientId:L.clientId, epoch:Date.now() }).then(function(){
+      if(jeton !== G.partieId) return;
+      if(!L.helloVu){
+        L.helloVu = true;
+        salonStatut('<span class="salon-point"></span>' + T("salonAttente"));
+        electionLigne();
+      }
+    }).catch(function(err){ deconnexionLigne(err); });
+  }).catch(function(err){
+    if(jeton !== G.partieId) return;
+    document.getElementById("overlay-salon").classList.add("cache");
+    document.getElementById("overlay-accueil").classList.remove("cache");
+    const code = err && err.code || "";
+    if(code === "ROOM_PREVIEW_REQUIRED" || code === "ROOM_BRIDGE_UNAVAILABLE"){
+      statutAccueil(T("besoinLob7"));
+    }else{
+      statutAccueil(T("salonIndispo", { code:code ? " (" + code + ")" : "" }));
+    }
+  });
+}
+function erreurAbonnementLigne(err){
+  const code = err && err.code || "";
+  if(CODES_FATAUX_LIGNE.indexOf(code) >= 0){ deconnexionLigne(err); return; }
+  if(G.mode === "ligne") ajouterJournal(T("jAlerteSalon", { code:code || "?" }), G.mesure, 0);
+}
+function quitterLigne(){
+  const L = G.ligne;
+  G.ligne = null;
+  if(L && L.stopSub){ try{ L.stopSub(); }catch(e){} }
+}
+function deconnexionLigne(err){
+  if(!G.ligne && G.mode !== "ligne") return;
+  const code = err && err.code || "";
+  arreterTimer();
+  G.partieId++;
+  quitterLigne();
+  G.mode = null; G.anim = null; G.rejouer = null; G.vainqueur = null;
+  G.ecran = "fin"; G.attente = null;
+  for(const id of ["overlay-passe","overlay-salon","overlay-accueil","overlay-fin"]) document.getElementById(id).classList.add("cache");
+  const sufCode = code ? " (" + code + ")" : "";
+  document.getElementById("perdu-detail").textContent = T("perduDetail", { code:sufCode });
+  document.getElementById("overlay-perdu").classList.remove("cache");
+  ajouterJournal(T("jConnexionPerdue", { code:sufCode }), G.mesure, 0);
+  majHeader();
+  majUI();
+}
+function traiterMessageLigne(message){
+  try{
+    const L = G.ligne;
+    if(!L || !L.conn || !message) return;
+    const d = message.data;
+    if(!d || typeof d !== "object") return;
+    if(message.sender && message.sender.id === L.conn.room.me.id){
+      /* Nos propres messages (écho du salon) : seul le hello nous intéresse. */
+      if(d.type === "hello" && !L.helloVu){
+        L.helloVu = true;
+        electionLigne();
+      }
+      return;
+    }
+    if(d.type === "hello"){
+      if(!L.adverse && typeof d.clientId === "string" && d.clientId &&
+         L.clientId !== d.clientId &&
+         typeof d.epoch === "number" && Math.abs(Date.now() - d.epoch) < 30 * 60 * 1000){
+        L.adverse = d.clientId;
+        electionLigne();
+      }
+      return;
+    }
+    if(!L.partie || d.partie !== L.partie) return; // partie liée à une autre session du salon
+    if(d.type === "programme"){
+      if(L.moi !== "azur") return; // seul l’hôte consomme le programme de Corail
+      if(typeof d.numero === "number" && d.tics && typeof d.tics === "object"){
+        L.recu = { numero:d.numero, tics:d.tics };
+        if(G.mode === "ligne" && G.ecran === "attente"){
+          montrerAttente("attenteRecu");
+          ligneVerifierPret();
+        }
+      }
+      return;
+    }
+    if(d.type === "resultat"){
+      if(L.moi !== "corail") return;
+      if(G.ecran !== "attente") return;             // déjà en résolution / idempotence
+      if(typeof d.numero !== "number" || d.numero < G.mesure) return;
+      rejouerResultat(d);
+      return;
+    }
+    if(d.type === "fin"){
+      if(L.moi !== "corail") return;
+      L.finRecue = {
+        vainqueur:(d.vainqueur === "azur" || d.vainqueur === "corail") ? d.vainqueur : null,
+        raison:typeof d.raison === "string" ? d.raison : ""
+      };
+      if(G.ecran === "prog" || G.ecran === "attente"){
+        finPartie(L.finRecue.vainqueur, L.finRecue.raison || T("raisonHote"));
+      }
+      return;
+    }
+  }catch(e){ /* message malformé : ignoré */ }
+}
+function electionLigne(){
+  const L = G.ligne;
+  if(!L || L.moi || !L.helloVu || !L.adverse) return;
+  const ids = [L.clientId, L.adverse].sort(); // plus petit clientId = Azur (hôte-arbitre)
+  L.partie = ids.join("|");
+  L.moi = (L.clientId === ids[0]) ? "azur" : "corail";
+  nouvellePartie("ligne");
+}
+function commencerMesureLigne(){
+  const L = G.ligne;
+  if(!L || !L.moi){ retourAccueil(); return; }
+  document.getElementById("overlay-passe").classList.add("cache");
+  document.getElementById("overlay-fin").classList.add("cache");
+  if(L.recu && L.recu.numero !== G.mesure) L.recu = null; // idempotence par numéro de mesure
+  L.proprie = false;
+  G.ecran = "prog";
+  G.joueurActif = L.moi;
+  const j = L.moi;
+  const ords = {};
+  for(const p of piecesDe(j)) ords[p.id] = [null, null, null];
+  G.ordres = { azur:{}, corail:{} };
+  G.ordres[j] = ords;
+  const vivantes = piecesDe(j);
+  G.saisie = vivantes.length ? { id:vivantes[0].id, tic:0 } : { id:null, tic:0 };
+  demarrerTimer();
+  ajouterJournal(T("jMesureLigne", { n:G.mesure, nom:nomSpan(j) }), G.mesure, 0);
+  majUI();
+}
+function envoyerProgrammeLigne(){
+  const L = G.ligne;
+  const tics = {};
+  for(const id in G.ordres.corail) tics[id] = G.ordres.corail[id].slice(0, 3);
+  const cle = idAleatoire();
+  ajouterJournal(T("jEnvoiProgramme"), G.mesure, 0);
+  envoyerLigne({ type:"programme", numero:G.mesure, cle:cle, tics:tics, partie:L.partie }, cle)
+    .catch(function(err){ deconnexionLigne(err); });
+}
+function dirLisible(v){
+  return (typeof v === "number" && Number.isInteger(v) && v >= -1 && v <= 5) ? v : -1;
+}
+function ligneVerifierPret(){
+  const L = G.ligne;
+  if(!L || L.moi !== "azur" || G.mode !== "ligne") return;
+  if(G.ecran !== "attente" || !L.proprie || !L.recu) return;
+  if(L.recu.numero !== G.mesure) return;
+  /* Programme distant borné : uniquement les pièces corail vivantes, directions valides. */
+  const ords = {};
+  for(const p of piecesDe("corail")){
+    const t = L.recu.tics[p.id];
+    const trois = Array.isArray(t) ? t : [];
+    ords[p.id] = [dirLisible(trois[0]), dirLisible(trois[1]), dirLisible(trois[2])];
+  }
+  G.ordres.corail = ords;
+  ajouterJournal(T("jRecuProgramme"), G.mesure, 0);
+  hoteResoudreEtDiffuser();
+}
+/* L’hôte simule la mesure entière sur une copie (moteur existant), puis diffuse. */
+function simulerMesure(pieces0, ordres){
+  const pieces = pieces0.map(function(p){ return { id:p.id, joueur:p.joueur, q:p.q, r:p.r }; });
+  const tics = [];
+  let nbTics = 0, terminee = false, vainqueur = null, raison = "";
+  const compteurs = { azur:G.compteurs.azur, corail:G.compteurs.corail };
+  for(let t = 0; t < 3 && !terminee; t++){
+    const o = {};
+    for(const p of pieces){
+      const ligne = (ordres[p.joueur] && ordres[p.joueur][p.id]) ? ordres[p.joueur][p.id][t] : -1;
+      o[p.id] = (ligne === null || ligne === undefined) ? -1 : ligne;
+    }
+    const res = CORE.resoudreTic(pieces, o);
+    tics.push({ mouvs:res.mouvs, evts:res.evts });
+    nbTics = t + 1;
+    for(const m of res.mouvs){
+      const p = pieces.find(function(x){ return x.id === m.id; });
+      if(!p) continue;
+      if(m.etat === "mort"){ pieces.splice(pieces.indexOf(p), 1); }
+      else if(m.etat === "ok"){ p.q = m.to.q; p.r = m.to.r; }
+    }
+    const na = pieces.filter(function(p){ return p.joueur === "azur"; }).length;
+    const nc = pieces.filter(function(p){ return p.joueur === "corail"; }).length;
+    if(na === 0 && nc === 0){ terminee = true; vainqueur = null; raison = T("raisonEgalite"); break; }
+    if(na === 0){ terminee = true; vainqueur = "corail"; raison = T("raisonAzur"); break; }
+    if(nc === 0){ terminee = true; vainqueur = "azur"; raison = T("raisonCorail"); break; }
+  }
+  if(!terminee){
+    const tenant = CORE.tenantDuCentre(pieces);
+    if(tenant){
+      compteurs[tenant]++;
+      if(compteurs[tenant] >= 2){
+        terminee = true; vainqueur = tenant; raison = T("raisonCentre", { nom:NOM_JOUEUR[tenant] });
+      }
+    }else{
+      compteurs.azur = 0; compteurs.corail = 0;
+    }
+  }
+  return { tics:tics, nbTics:nbTics, plateauFinal:pieces, compteurs:compteurs, terminee:terminee, vainqueur:vainqueur, raison:raison };
+}
+function hoteResoudreEtDiffuser(){
+  const L = G.ligne;
+  const sim = simulerMesure(G.pieces, G.ordres);
+  const payload = {
+    type:"resultat", numero:G.mesure, partie:L.partie,
+    programmes:{ azur:G.ordres.azur, corail:G.ordres.corail },
+    plateauAvant:G.pieces, plateau:sim.plateauFinal,
+    evenements:sim.tics, nbTics:sim.nbTics,
+    compteurs:sim.compteurs, terminee:sim.terminee,
+    vainqueur:sim.vainqueur, raison:sim.raison
+  };
+  ajouterJournal(T("jHoteResout", { n:G.mesure }), G.mesure, 0);
+  envoyerLigne(payload).then(function(){
+    if(sim.terminee){
+      return envoyerLigne({ type:"fin", numero:G.mesure, partie:L.partie, vainqueur:sim.vainqueur, raison:sim.raison });
+    }
+  }).catch(function(err){ deconnexionLigne(err); });
+  lancerRejeu({
+    numero:G.mesure, tics:sim.tics, nbTics:sim.nbTics,
+    plateauFinal:sim.plateauFinal, compteurs:sim.compteurs,
+    terminee:sim.terminee, vainqueur:sim.vainqueur, raison:sim.raison
+  });
+}
+/* Les deux écrans rejouent la même animation à partir des données de l’hôte. */
+function lancerRejeu(r){
+  G.rejouer = r;
+  G.ecran = "resolution";
+  G.resTic = 0;
+  ajouterJournal("<span class=\u0022j-or\u0022>" + T("jResMesure", { n:r.numero }) + "</span>", r.numero, 0);
+  lancerTic(0);
+  majUI();
+}
+function rejouerResultat(d){
+  const programmes = (d.programmes && typeof d.programmes === "object") ? d.programmes : {};
+  function epuise(prog){
+    const out = {};
+    if(prog && typeof prog === "object"){
+      for(const id in prog){
+        const t = prog[id];
+        out[id] = [dirLisible(t && t[0]), dirLisible(t && t[1]), dirLisible(t && t[2])];
+      }
+    }
+    return out;
+  }
+  G.ordres = { azur:epuise(programmes.azur), corail:epuise(programmes.corail) };
+  if(Array.isArray(d.plateauAvant) && d.plateauAvant.length){
+    G.pieces = d.plateauAvant
+      .filter(function(p){ return p && typeof p.id === "string"; })
+      .map(function(p){ return { id:p.id, joueur:(p.joueur === "azur" ? "azur" : "corail"), q:p.q | 0, r:p.r | 0 }; });
+  }
+  const tics = Array.isArray(d.evenements) ? d.evenements.slice(0, 3) : [];
+  const nbTics = Math.max(1, Math.min(tics.length, typeof d.nbTics === "number" ? (d.nbTics | 0) : tics.length));
+  const compteurs = (d.compteurs && typeof d.compteurs === "object") ? d.compteurs : {};
+  ajouterJournal(T("jRejeu", { n:d.numero }), d.numero, 0);
+  lancerRejeu({
+    numero:d.numero, tics:tics, nbTics:nbTics,
+    plateauFinal:Array.isArray(d.plateau) ? d.plateau : null,
+    compteurs:{ azur:compteurs.azur | 0, corail:compteurs.corail | 0 },
+    terminee:!!d.terminee,
+    vainqueur:(d.vainqueur === "azur" || d.vainqueur === "corail") ? d.vainqueur : null,
+    raison:typeof d.raison === "string" ? d.raison : ""
+  });
+}
+
+/* ---------- Journal ---------- */
+function ajouterJournal(html, mesure, tic){
+  const li = document.createElement("li");
+  const badge = document.createElement("span");
+  badge.className = "badge";
+  badge.textContent = (mesure ? "M" + mesure : "") + (tic ? "·T" + tic : "") + (mesure || tic ? " — " : "");
+  li.appendChild(badge);
+  const span = document.createElement("span");
+  span.innerHTML = html;
+  li.appendChild(span);
+  const ul = document.getElementById("journal");
+  ul.insertBefore(li, ul.firstChild);
+  while(ul.children.length > 90) ul.removeChild(ul.lastChild);
+}
+
+/* ============================================================
+   RENDU — canvas HiDPI, hexagones pointy-top, pions métronomes.
+   ============================================================ */
+const canvas = document.getElementById("plateau");
+const ctx = canvas.getContext("2d");
+const L = { W:0, H:0, dpr:1, S:20, cx:0, cy:0 };
+
+function redimensionner(){
+  const rect = canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  L.W = Math.max(80, rect.width); L.H = Math.max(80, rect.height); L.dpr = dpr;
+  canvas.width = Math.round(L.W * dpr);
+  canvas.height = Math.round(L.H * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  /* Rayon hexagonal S : le plateau (rayon 2) tient dans le canvas.
+     Bornes en unités S=1 : largeur 7·√3, hauteur 8. */
+  const SQ3 = Math.sqrt(3);
+  L.S = Math.min((L.W - 70) / (7 * SQ3), (L.H - 80) / 8);
+  L.S = Math.max(12, L.S);
+  L.cx = L.W / 2; L.cy = L.H / 2;
+}
+if(typeof ResizeObserver !== "undefined"){
+  new ResizeObserver(redimensionner).observe(document.getElementById("zone-plateau"));
+}
+window.addEventListener("resize", redimensionner);
+/* Zoom / changement de densité de pixels : recadrer le canvas. */
+(function(){
+  let mq = null;
+  function abonner(){
+    const dpr = window.devicePixelRatio || 1;
+    try{ mq = window.matchMedia("(resolution: " + dpr + "dppx)"); }catch(e){ return; }
+    const ecoute = ("addEventListener" in mq) ? mq.addEventListener.bind(mq, "change") : mq.addListener.bind(mq);
+    ecoute(function(){ redimensionner(); abonner(); });
+  }
+  abonner();
+})();
+
+function hexToPix(q, r){
+  const SQ3 = Math.sqrt(3);
+  return { x:L.cx + SQ3 * L.S * (q + r / 2), y:L.cy + 1.5 * L.S * r };
+}
+function pixToHex(mx, my){
+  const SQ3 = Math.sqrt(3);
+  const xf = (mx - L.cx) / L.S, yf = (my - L.cy) / L.S;
+  const qf = (SQ3 / 3) * xf - yf / 3, rf = (2 / 3) * yf;
+  let x = qf, z = rf, y = -x - z;
+  let rx = Math.round(x), ry = Math.round(y), rz = Math.round(z);
+  const dx = Math.abs(rx - x), dy = Math.abs(ry - y), dz = Math.abs(rz - z);
+  if(dx > dy && dx > dz) rx = -ry - rz;
+  else if(dy > dz) ry = -rx - rz;
+  else rz = -rx - ry;
+  return { q:rx, r:rz };
+}
+function cheminHex(x, y, s, reduc){
+  const R = s * (reduc || 1);
+  ctx.beginPath();
+  for(let k = 0; k < 6; k++){
+    const a = Math.PI / 180 * (60 * k - 90);
+    const px = x + R * Math.cos(a), py = y + R * Math.sin(a);
+    if(k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+}
+function melange(hex, autre, t){
+  const p = function(h){
+    h = h.replace("#", "");
+    return [parseInt(h.substr(0,2),16), parseInt(h.substr(2,2),16), parseInt(h.substr(4,2),16)];
+  };
+  const a = p(hex), b = p(autre);
+  return "rgb(" + a.map(function(v,i){ return Math.round(v + (b[i]-v)*t); }).join(",") + ")";
+}
+function eclaircir(hex, t){ return melange(hex, "#ffffff", t); }
+function assombrir(hex, t){ return melange(hex, "#241c14", t); }
+function hexA(hex, a){
+  const h = hex.replace("#","");
+  return "rgba(" + parseInt(h.substr(0,2),16) + "," + parseInt(h.substr(2,2),16) + "," + parseInt(h.substr(4,2),16) + "," + a + ")";
+}
+
+/* --- Pion métronome procédural (soigné, pas d’asset requis) --- */
+function dessinerMetronome(x, y, T, couleur, pendule, intensite){
+  const w = T * 0.60, h = T * 0.86;
+  const yHaut = y - h * 0.50, yBas = y + h * 0.44;
+  const wBas = w, wHaut = w * 0.40;
+  /* Ombre portée douce brune. */
+  ctx.save();
+  ctx.globalAlpha = 0.30; ctx.fillStyle = "#6b4e37";
+  ctx.beginPath(); ctx.ellipse(x, yBas + T * 0.05, w * 0.55, w * 0.17, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+  /* Halo du joueur actif / de la résolution. */
+  if(intensite > 0.02){
+    const g = ctx.createRadialGradient(x, y, 0, x, y, T * 0.78);
+    g.addColorStop(0, hexA(couleur, 0.30 * intensite));
+    g.addColorStop(1, hexA(couleur, 0));
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(x, y, T * 0.78, 0, Math.PI * 2); ctx.fill();
+  }
+  /* Corps pyramidal. */
+  const grad = ctx.createLinearGradient(0, yHaut, 0, yBas);
+  grad.addColorStop(0, eclaircir(couleur, 0.30));
+  grad.addColorStop(0.55, couleur);
+  grad.addColorStop(1, assombrir(couleur, 0.45));
+  ctx.beginPath();
+  ctx.moveTo(x - wBas / 2, yBas);
+  ctx.lineTo(x - wHaut / 2, yHaut + T * 0.05);
+  ctx.quadraticCurveTo(x - wHaut / 2, yHaut, x - wHaut / 2 + T * 0.025, yHaut);
+  ctx.lineTo(x + wHaut / 2 - T * 0.025, yHaut);
+  ctx.quadraticCurveTo(x + wHaut / 2, yHaut, x + wHaut / 2, yHaut + T * 0.05);
+  ctx.closePath();
+  ctx.fillStyle = grad; ctx.fill();
+  ctx.lineWidth = Math.max(1.1, T * 0.026);
+  ctx.strokeStyle = hexA(COUL.encre, 0.9);
+  ctx.stroke();
+  /* Socle. */
+  ctx.fillStyle = assombrir(couleur, 0.55);
+  ctx.fillRect(x - w * 0.58, yBas, w * 1.16, T * 0.085);
+  ctx.strokeStyle = hexA(COUL.encre, 0.6);
+  ctx.lineWidth = Math.max(0.8, T * 0.02);
+  ctx.strokeRect(x - w * 0.58, yBas, w * 1.16, T * 0.085);
+  /* Capot. */
+  ctx.beginPath();
+  ctx.moveTo(x - wHaut / 2, yHaut + T * 0.045);
+  ctx.lineTo(x - wHaut * 0.22, yHaut - T * 0.055);
+  ctx.lineTo(x + wHaut * 0.22, yHaut - T * 0.055);
+  ctx.lineTo(x + wHaut / 2, yHaut + T * 0.045);
+  ctx.closePath();
+  ctx.fillStyle = eclaircir(couleur, 0.18); ctx.fill();
+  ctx.strokeStyle = hexA(COUL.encre, 0.85); ctx.stroke();
+  /* Fenêtre sombre. */
+  const fB = w * 0.70, fH = w * 0.22, fy1 = yHaut + T * 0.14, fy2 = yBas - T * 0.06;
+  ctx.beginPath();
+  ctx.moveTo(x - fB / 2, fy2); ctx.lineTo(x - fH / 2, fy1);
+  ctx.lineTo(x + fH / 2, fy1); ctx.lineTo(x + fB / 2, fy2);
+  ctx.closePath();
+  ctx.fillStyle = "rgba(32,26,19,0.88)"; ctx.fill();
+  /* Pendule (bâti + poids) — angle en radians, 0 = vertical. */
+  const px = x, py = yHaut + T * 0.17, lg = (fy2 - fy1) * 0.86;
+  ctx.save();
+  ctx.translate(px, py); ctx.rotate(pendule || 0);
+  ctx.strokeStyle = hexA("#f7f0e2", 0.95);
+  ctx.lineWidth = Math.max(1.2, T * 0.030);
+  ctx.beginPath(); ctx.moveTo(0, -lg * 0.20); ctx.lineTo(0, lg * 0.86); ctx.stroke();
+  ctx.fillStyle = COUL.ivoire;
+  ctx.beginPath(); ctx.arc(0, lg * 0.78, w * 0.135, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = "rgba(32,26,19,0.8)"; ctx.lineWidth = Math.max(1, T * 0.02); ctx.stroke();
+  ctx.fillStyle = hexA("#f7f0e2", 0.85);
+  ctx.beginPath(); ctx.arc(0, -lg * 0.17, w * 0.06, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+  /* Axe. */
+  ctx.fillStyle = COUL.ivoire;
+  ctx.beginPath(); ctx.arc(px, py, w * 0.055, 0, Math.PI * 2); ctx.fill();
+}
+
+/* --- Pièce : asset si disponible, sinon procédural --- */
+function dessinerPiece(id, x, y, alpha, pendule, intensite){
+  const p = G.pieces.find(function(z){ return z.id === id; });
+  const couleur = p ? COUL[p.joueur] : COUL.encre;
+  const T = L.S * 1.62;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  const img = asset(p && p.joueur === "azur" ? "metronome/pion/azur" : "metronome/pion/corail", Math.ceil(T * L.dpr));
+  if(img){
+    /* Ombre portée brune douce + liseré d'encre autour du sprite (thème clair). */
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.28;
+    ctx.fillStyle = "#6b4e37";
+    ctx.beginPath();
+    ctx.ellipse(x, y + T * 0.46, T * 0.34, T * 0.10, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    ctx.drawImage(img, x - T / 2, y - T / 2, T, T);
+    ctx.lineWidth = Math.max(1.4, T * 0.035);
+    ctx.strokeStyle = hexA(COUL.encre, 0.75);
+    ctx.strokeRect(x - T / 2, y - T / 2, T, T);
+    if(intensite > 0.02){
+      const g = ctx.createRadialGradient(x, y, 0, x, y, T * 0.7);
+      g.addColorStop(0, hexA(couleur, 0.22 * intensite));
+      g.addColorStop(1, hexA(couleur, 0));
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(x, y, T * 0.7, 0, Math.PI * 2); ctx.fill();
+    }
+  }else{
+    dessinerMetronome(x, y, T, couleur, pendule, intensite);
+  }
+  ctx.restore();
+  /* Étiquette. */
+  ctx.save();
+  ctx.globalAlpha = alpha * 0.72;
+  ctx.fillStyle = COUL.encre;
+  ctx.font = "600 " + Math.max(9, L.S * 0.26) + "px " + "Segoe UI, system-ui, sans-serif";
+  ctx.textAlign = "center"; ctx.textBaseline = "top";
+  ctx.fillText(id, x, y + L.S * 0.86);
+  ctx.restore();
+}
+
+/* --- Effet de duel (icône asset ou croix procédurale) --- */
+function dessinerDuel(x, y, t){
+  const taille = L.S * 1.5 * (0.8 + 0.25 * t);
+  const img = asset("common/icone_duel", Math.ceil(taille * L.dpr));
+  ctx.save();
+  const halo = ctx.createRadialGradient(x, y, 0, x, y, taille * 0.9);
+  halo.addColorStop(0, hexA(COUL.vermillon, 0.5 * (1 - t * 0.5)));
+  halo.addColorStop(1, hexA(COUL.vermillon, 0));
+  ctx.fillStyle = halo;
+  ctx.beginPath(); ctx.arc(x, y, taille * 0.9, 0, Math.PI * 2); ctx.fill();
+  if(img){
+    ctx.globalAlpha = 1 - t * 0.6;
+    ctx.drawImage(img, x - taille / 2, y - taille / 2, taille, taille);
+  }else{
+    ctx.globalAlpha = 1 - t * 0.6;
+    ctx.strokeStyle = COUL.vermillon; ctx.lineWidth = Math.max(2, L.S * 0.09);
+    ctx.lineCap = "round";
+    const d = taille * 0.30;
+    ctx.beginPath();
+    ctx.moveTo(x - d, y - d); ctx.lineTo(x + d, y + d);
+    ctx.moveTo(x + d, y - d); ctx.lineTo(x - d, y + d);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/* --- Rosette des 6 directions (aide, coin bas-droit) --- */
+function dessinerRosette(){
+  if(L.W < 430 || L.H < 380) return;
+  const taille = Math.min(120, L.W * 0.16, L.H * 0.2);
+  const x = L.W - taille / 2 - 14, y = L.H - taille / 2 - 14;
+  const img = asset("common/fleches6", Math.ceil(taille * L.dpr));
+  if(img){
+    ctx.save(); ctx.globalAlpha = 0.75;
+    ctx.drawImage(img, x - taille / 2, y - taille / 2, taille, taille);
+    ctx.restore();
+    return;
+  }
+  ctx.save();
+  ctx.globalAlpha = 0.6;
+  ctx.strokeStyle = COUL.encre; ctx.fillStyle = COUL.encre;
+  ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.arc(x, y, taille * 0.44, 0, Math.PI * 2); ctx.stroke();
+  const r = taille * 0.30, lt = taille * 0.10;
+  for(let d = 0; d < 6; d++){
+    const a = Math.PI / 180 * ANGLE_DIR[d];
+    const vx = x + Math.cos(a) * r, vy = y + Math.sin(a) * r;
+    ctx.save(); ctx.translate(vx, vy); ctx.rotate(a);
+    ctx.beginPath();
+    ctx.moveTo(lt * 0.7, 0); ctx.lineTo(-lt * 0.5, -lt * 0.55); ctx.lineTo(-lt * 0.5, lt * 0.55);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+/* --- Prévisualisation du programme (joueur actif uniquement) --- */
+function positionsCumulees(piece, ordoJoueur){
+  const cum = [{ q:piece.q, r:piece.r }];
+  for(let t = 0; t < 3; t++){
+    const d = ordoJoueur[piece.id] ? ordoJoueur[piece.id][t] : null;
+    const dir = (d === null || d === undefined || d < 0) ? { q:0, r:0 } : CORE.DIRS[d];
+    const prev = cum[cum.length - 1];
+    cum.push({ q:prev.q + dir.q, r:prev.r + dir.r });
+  }
+  return cum;
+}
+function dessinerApercu(){
+  if(G.ecran !== "prog" || !G.joueurActif) return;
+  const j = G.joueurActif;
+  const piece = G.pieces.find(function(p){ return p.id === G.saisie.id && p.joueur === j; });
+  if(!piece) return;
+  const couleur = COUL[j];
+  const cum = positionsCumulees(piece, G.ordres[j]);
+  /* Cases fantômes du chemin + flèches, jusqu’à la première cellule non saisie. */
+  ctx.save();
+  ctx.lineWidth = Math.max(1.4, L.S * 0.06);
+  ctx.setLineDash([L.S * 0.14, L.S * 0.13]);
+  let stop = 0;
+  for(let t = 0; t < 3; t++){
+    const d = G.ordres[j][piece.id] ? G.ordres[j][piece.id][t] : null;
+    if(d === null || d === undefined) break;
+    stop = t + 1;
+  }
+  for(let t = 1; t <= stop; t++){
+    const c = cum[t];
+    if(!CORE.dansPlateau(c.q, c.r)) continue;
+    const pt = hexToPix(c.q, c.r);
+    ctx.strokeStyle = hexA(couleur, 0.75);
+    cheminHex(pt.x, pt.y, L.S, 0.72);
+    ctx.stroke();
+    /* Flèche du pas précédent. */
+    const a = hexToPix(cum[t - 1].q, cum[t - 1].r);
+    const dx = pt.x - a.x, dy = pt.y - a.y;
+    const ang = Math.atan2(dy, dx), dist = Math.hypot(dx, dy);
+    if(dist > L.S * 0.3){
+      const mx = a.x + dx * 0.5, my = a.y + dy * 0.5;
+      ctx.save();
+      ctx.translate(mx, my); ctx.rotate(ang);
+      ctx.setLineDash([]);
+      ctx.fillStyle = hexA(couleur, 0.9);
+      const s = L.S * 0.24;
+      ctx.beginPath(); ctx.moveTo(s, 0); ctx.lineTo(-s * 0.6, -s * 0.6); ctx.lineTo(-s * 0.6, s * 0.6);
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+      ctx.setLineDash([L.S * 0.14, L.S * 0.13]);
+    }
+  }
+  ctx.restore();
+  /* Voisins cliquables pour la cellule sélectionnée. */
+  const base = cum[G.saisie.tic];
+  if(!CORE.dansPlateau(base.q, base.r)) return;
+  const bp = hexToPix(base.q, base.r);
+  ctx.save();
+  ctx.lineWidth = Math.max(1.3, L.S * 0.05);
+  for(let d = 0; d < 6; d++){
+    const nq = base.q + CORE.DIRS[d].q, nr = base.r + CORE.DIRS[d].r;
+    if(!CORE.dansPlateau(nq, nr)) continue;
+    const pt = hexToPix(nq, nr);
+    const survol = G.hoverHex && G.hoverHex.q === nq && G.hoverHex.r === nr;
+    cheminHex(pt.x, pt.y, L.S, 0.8);
+    if(survol){ ctx.fillStyle = hexA(COUL.bois, 0.20); ctx.fill(); }
+    ctx.strokeStyle = hexA(COUL.bois, survol ? 0.95 : 0.5);
+    if(survol) ctx.setLineDash([]); else ctx.setLineDash([L.S * 0.16, L.S * 0.12]);
+    ctx.stroke(); ctx.setLineDash([]);
+    const ang = Math.PI / 180 * ANGLE_DIR[d];
+    ctx.save();
+    ctx.translate(pt.x, pt.y); ctx.rotate(ang);
+    ctx.fillStyle = hexA(COUL.bois, survol ? 0.95 : 0.55);
+    const s = L.S * 0.17;
+    ctx.beginPath(); ctx.moveTo(s, 0); ctx.lineTo(-s * 0.65, -s * 0.62); ctx.lineTo(-s * 0.65, s * 0.62);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+  /* Marqueur « rester » sur la base. */
+  const survolBase = G.hoverHex && G.hoverHex.q === base.q && G.hoverHex.r === base.r;
+  cheminHex(bp.x, bp.y, L.S, 0.62);
+  ctx.strokeStyle = hexA(couleur, survolBase ? 0.95 : 0.5);
+  ctx.setLineDash([L.S * 0.16, L.S * 0.12]);
+  ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle = hexA(couleur, 0.85);
+  ctx.font = "600 " + Math.max(11, L.S * 0.34) + "px Segoe UI, system-ui, sans-serif";
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText("—", bp.x, bp.y + L.S * 0.02);
+  ctx.restore();
+}
+
+/* --- Interpolation d’animation d’un tic --- */
+function easeOutCubic(t){ return 1 - Math.pow(1 - t, 3); }
+function positionAnim(now, p){
+  /* Retourne {x, y, alpha, pendule} pour la pièce p à cet instant. */
+  const couleur = COUL[p.joueur];
+  const base = hexToPix(p.q, p.r);
+  let x = base.x, y = base.y, alpha = 1;
+  if(G.anim){
+    const m = null;
+    const mm = G.anim.mouvs.find(function(z){ return z.id === p.id; });
+    if(mm){
+      const t = Math.min(1, Math.max(0, (now - G.anim.debut) / G.anim.duree));
+      if(mm.etat === "ok"){
+        const dest = hexToPix(mm.to.q, mm.to.r);
+        const e = easeOutCubic(t);
+        x = base.x + (dest.x - base.x) * e;
+        y = base.y + (dest.y - base.y) * e;
+      }else if(mm.etat === "rebond" || mm.etat === "reste"){
+        if(mm.dir >= 0 && mm.etat === "rebond"){
+          const dir = CORE.DIRS[mm.dir];
+          const dest = hexToPix(p.q + dir.q, p.r + dir.r);
+          const k = Math.sin(Math.PI * Math.min(1, t)) * 0.30;
+          x = base.x + (dest.x - base.x) * k;
+          y = base.y + (dest.y - base.y) * k;
+        }
+      }else if(mm.etat === "mort"){
+        const dest = hexToPix(mm.to.q, mm.to.r);
+        x = base.x + (dest.x - base.x) * 0.68 * t;
+        y = base.y + (dest.y - base.y) * 0.68 * t;
+        alpha = 1 - Math.min(1, Math.max(0, (t - 0.25) / 0.6));
+      }
+    }
+  }
+  return { x:x, y:y, alpha:alpha };
+}
+
+/* --- Dessin principal --- */
+function dessiner(now){
+  ctx.clearRect(0, 0, L.W, L.H);
+  /* Fond : léger dégradé radial + vignettage. */
+  const fond = ctx.createRadialGradient(L.cx, L.cy, L.S, L.cx, L.cy, Math.max(L.W, L.H) * 0.75);
+  fond.addColorStop(0, "#f4eee0");
+  fond.addColorStop(1, "#e6d8bc");
+  ctx.fillStyle = fond;
+  ctx.fillRect(0, 0, L.W, L.H);
+
+  /* Cases. */
+  const imgCase = asset("common/case_hex", Math.ceil(2 * L.S * L.dpr));
+  for(const c of CASES){
+    const pt = hexToPix(c.q, c.r);
+    if(imgCase){
+      const SQ3 = Math.sqrt(3);
+      ctx.drawImage(imgCase, pt.x - SQ3 / 2 * L.S, pt.y - L.S, SQ3 * L.S, 2 * L.S);
+    }else{
+      cheminHex(pt.x, pt.y, L.S, 0.94);
+      ctx.save();
+      ctx.shadowColor = "rgba(90,62,38,0.30)";
+      ctx.shadowBlur = Math.max(3, L.S * 0.13);
+      ctx.shadowOffsetY = Math.max(2, L.S * 0.09);
+      ctx.fillStyle = "#f7f0e2";
+      ctx.fill();
+      ctx.restore();
+      ctx.lineWidth = 1.2;
+      ctx.strokeStyle = hexA(COUL.encre, 0.5);
+      ctx.stroke();
+    }
+    if(c.q === 0 && c.r === 0){
+      /* Le centre : double contour or + gemme. */
+      cheminHex(pt.x, pt.y, L.S, 0.80);
+      ctx.strokeStyle = hexA(COUL.vermillon, 0.65);
+      ctx.lineWidth = Math.max(1.2, L.S * 0.05);
+      ctx.stroke();
+      const scintille = 0.55 + 0.25 * Math.sin(now / 900);
+      ctx.fillStyle = hexA(COUL.vermillon, scintille);
+      ctx.save();
+      ctx.translate(pt.x, pt.y); ctx.rotate(Math.PI / 4);
+      const g = L.S * 0.13;
+      ctx.fillRect(-g / 2, -g / 2, g, g);
+      ctx.restore();
+    }
+  }
+
+  /* Aperçu du programme du joueur actif (sous les pièces). */
+  dessinerApercu();
+
+  /* Pièces vivantes. */
+  const enRes = G.ecran === "resolution" && G.anim;
+  for(const p of G.pieces){
+    const pos = positionAnim(now, p);
+    let pendule = 0.06, intensite = 0.3;
+    if(enRes){
+      const ph = ((now - G.anim.debut) / G.anim.duree) % 1;
+      pendule = 0.34 * Math.sin(2 * Math.PI * ph);
+      intensite = 0.85;
+    }else if(G.ecran === "prog" && G.joueurActif === p.joueur){
+      pendule = 0.22 * Math.sin(now / 240);
+      intensite = 0.85;
+    }else if(G.ecran === "fin"){
+      pendule = 0;
+      intensite = (G.vainqueur && G.vainqueur.joueur === p.joueur) ? 0.9 : 0.15;
+    }
+    dessinerPiece(p.id, pos.x, pos.y, pos.alpha, pendule, intensite);
+  }
+
+  /* Effets de fin de tic (duels, rebonds). */
+  if(enRes){
+    const t = Math.min(1, Math.max(0, (now - G.anim.debut) / G.anim.duree));
+    if(t > 0.35){
+      for(const e of G.anim.evts){
+        if(e.type === "duel" || e.type === "allie"){
+          const pt = hexToPix(e.case.q, e.case.r);
+          if(e.type === "duel") dessinerDuel(pt.x, pt.y, (t - 0.35) / 0.65);
+        }else{
+          /* Anneau discret sur les rebonds. */
+          for(const id of e.ids){
+            const m = G.anim.mouvs.find(function(z){ return z.id === id; });
+            if(!m) continue;
+            const pt = hexToPix(m.from.q, m.from.r);
+            const k = (t - 0.35) / 0.65;
+            ctx.save();
+            ctx.globalAlpha = 0.5 * (1 - k);
+            ctx.strokeStyle = COUL.bois;
+            ctx.lineWidth = 1.6;
+            cheminHex(pt.x, pt.y, L.S, 0.9 + 0.25 * k);
+            ctx.stroke();
+            ctx.restore();
+          }
+        }
+      }
+    }
+  }
+
+  /* Rosette d’aide pendant la programmation. */
+  if(G.ecran === "prog") dessinerRosette();
+
+  /* Survol générique de case (hors cases déjà marquées). */
+  if(G.hoverHex && CORE.dansPlateau(G.hoverHex.q, G.hoverHex.r) && G.ecran !== "prog"){
+    const pt = hexToPix(G.hoverHex.q, G.hoverHex.r);
+    ctx.save();
+    ctx.globalAlpha = 0.35;
+    cheminHex(pt.x, pt.y, L.S, 0.94);
+    ctx.strokeStyle = COUL.encre; ctx.lineWidth = 1.4; ctx.stroke();
+    ctx.restore();
+  }
+}
+
+/* ============================================================
+   UI DOM — panneau latéral, grille de programmation, overlays.
+   ============================================================ */
+function svgFleche(d, taille, couleur){
+  const a = ANGLE_DIR[d];
+  const s = taille / 2;
+  return '<svg width="' + taille + '" height="' + taille + '" viewBox="-12 -12 24 24">' +
+    '<g transform="rotate(' + a + ')" stroke="' + couleur + '" stroke-width="2.4" fill="' + couleur + '" stroke-linecap="round">' +
+    '<line x1="-7" y1="0" x2="4.5" y2="0"/>' +
+    '<path d="M3.5,-5 L10,0 L3.5,5 Z" stroke="none"/></g></svg>';
+}
+function svgFlecheCellule(d, taille){
+  return svgFleche(d, taille, COUL.encre);
+}
+function majCompteurs(){
+  for(const j of ["azur", "corail"]){
+    const el = document.getElementById("past-" + j);
+    if(!el) continue;
+    const pastilles = el.querySelectorAll("i");
+    for(let k = 0; k < pastilles.length; k++){
+      pastilles[k].className = (k < G.compteurs[j]) ? ("pleine j-" + j) : "";
+    }
+  }
+}
+function majUI(){
+  majCompteurs();
+  majInfoPhase();
+  majZoneProg();
+  majZoneRevele();
+}
+function majInfoPhase(){
+  const el = document.getElementById("info-phase");
+  let phase = "", detail = "";
+  if(G.ecran === "accueil"){
+    phase = T("hudAccueil");
+    detail = T("hudAccueilDetail");
+  }else if(G.ecran === "passe"){
+    if(G.mode === "ia"){
+      phase = T("hudPasseIa", { nom:nomSpan(G.passeJoueur) });
+      detail = T("hudPasseIaDetail");
+    }else{
+      phase = T("hudPasse", { nom:nomSpan(G.passeJoueur) });
+      detail = T("hudPasseDetail");
+    }
+  }else if(G.ecran === "prog"){
+    phase = T("hudProg", { nom:nomSpan(G.joueurActif), toi:(G.mode === "ligne" ? T("toi") : "") });
+    detail = (G.mode === "ligne") ? T("hudProgDetailLigne") : T("hudProgDetail");
+  }else if(G.ecran === "attente"){
+    phase = (G.attente && G.attente.key) ? T(G.attente.key, G.attente.vars) : T("enAttente");
+    if(G.mode === "ia") detail = T("hudAttenteIaDetail");
+    else if(G.mode === "ligne") detail = T("hudAttenteLigneDetail");
+    else detail = "";
+  }else if(G.ecran === "resolution"){
+    phase = T("hudResolution", { n:G.resTic + 1 });
+    detail = T("hudResolutionDetail");
+  }else{
+    const v = G.vainqueur;
+    if(v){
+      phase = v.joueur ? T("emporte", { nom:nomSpan(v.joueur) }) : T("egaliteCourt");
+      detail = v.raison;
+    }else{ phase = T("partieTerminee"); detail = ""; }
+  }
+  el.innerHTML = '<div class="mesure">' + T("mesureLbl", { n:G.mesure }) + "</div>" +
+    '<div class="phase">' + phase + '</div><div class="detail">' + detail + "</div>" +
+    '<div class="timer-ligne' + (G.timer.reste <= 5000 && G.timer.actif === true ? " timer-alerte" : "") + '" id="timer-ligne" style="display:' + (G.ecran === "prog" ? "flex" : "none") + '">' +
+    '<div class="timer-bar"><div id="timer-fill"></div></div><span id="timer-txt"></span></div>' +
+    '<div class="durees">' + T("timerLbl") + " " + DUREES_TIMER.map(function(d){
+      return '<button class="duree-btn' + (G.timer.duree === d.ms ? " actif" : "") + '" data-ms="' + d.ms + '">' + d.lbl + "</button>";
+    }).join("") + "</div>";
+  majTimerAffichage();
+}
+function majTimerAffichage(){
+  const fill = document.getElementById("timer-fill");
+  const txt = document.getElementById("timer-txt");
+  if(!fill || !txt) return;
+  const frac = Math.max(0, Math.min(1, G.timer.reste / G.timer.duree));
+  fill.style.width = (frac * 100).toFixed(1) + "%";
+  const s = Math.ceil(G.timer.reste / 1000);
+  txt.textContent = "0:" + (s < 10 ? "0" : "") + s;
+  const ligne = document.getElementById("timer-ligne");
+  if(ligne) ligne.classList.toggle("timer-alerte", G.timer.actif === true && G.timer.reste <= 5000);
+}
+function majZoneProg(){
+  const el = document.getElementById("zone-prog");
+  if(G.ecran !== "prog" || !G.joueurActif){ el.innerHTML = ""; return; }
+  const j = G.joueurActif;
+  const vivantes = piecesDe(j);
+  let html = '<div class="prog-grille"><div></div>' +
+    '<div class="pg-head">' + T("tic", { n:1 }) + '</div><div class="pg-head">' + T("tic", { n:2 }) + '</div><div class="pg-head">' + T("tic", { n:3 }) + "</div>";
+  for(const p of vivantes){
+    html += '<div class="pg-label"><span class="pt ' + j + '"></span>' + T("metronomeLbl", { n:p.id.slice(1) }) +
+      ' <span class="coord">(' + p.q + ", " + p.r + ")</span></div>";
+    for(let t = 0; t < 3; t++){
+      const d = G.ordres[j][p.id] ? G.ordres[j][p.id][t] : null;
+      const actif = G.saisie.id === p.id && G.saisie.tic === t;
+      let contenu;
+      if(d === null || d === undefined) contenu = '<span>·</span>';
+      else if(d < 0) contenu = '<span style="color:var(--encre); font-size:15px;">—</span>';
+      else contenu = svgFlecheCellule(d, 22);
+      html += '<button class="pg-cell' + (actif ? " actif" : "") + '" data-pid="' + p.id + '" data-tic="' + t +
+        '" title="' + T("tic", { n:t + 1 }) + '">' + contenu + "</button>";
+    }
+  }
+  html += "</div>";
+  /* Pavé directionnel. */
+  const zones = [["nw", 2], ["ne", 1], ["w", 3], ["rst", -1], ["e", 0], ["sw", 4], ["se", 5]];
+  html += '<div class="pave">';
+  for(const z of zones){
+    html += '<button data-d="' + z[1] + '" style="grid-area:' + z[0] + '" title="' +
+      (z[1] < 0 ? T("rester") : T("dirs")[z[1]]) + '">' +
+      (z[1] < 0 ? '<span class="rst">—</span>' : svgFlecheCellule(z[1], 24)) + "</button>";
+  }
+  html += "</div>";
+  html += '<button class="primaire" id="btn-valider">' + T("valider") + "</button>";
+  html += '<div class="aide">' + T("aideProg") + "</div>";
+  el.innerHTML = html;
+}
+function majZoneRevele(){
+  const el = document.getElementById("zone-revele");
+  if(G.ecran !== "resolution" && G.ecran !== "fin"){ el.innerHTML = ""; return; }
+  let html = "";
+  for(const j of ["azur", "corail"]){
+    const ords = G.ordres[j];
+    const ids = Object.keys(ords).sort();
+    html += '<div class="rev-bloc"><div class="rev-titre j-' + j + '">' + T("programmeLbl", { nom:NOM_JOUEUR[j] }) + "</div>";
+    for(const id of ids){
+      const vivante = G.pieces.some(function(p){ return p.id === id; });
+      html += '<div class="rev-ligne" style="' + (vivante ? "" : "opacity:.45;") + '"><span class="pt ' + j + '"></span>' + id;
+      for(let t = 0; t < 3; t++){
+        const d = ords[id][t];
+        const cls = "fl" + (G.ecran === "resolution" ? (t < G.resTic ? " fait" : (t === G.resTic ? " courant" : "")) : " fait");
+        html += '<span class="' + cls + '">' + (d < 0 ? '<span style="color:var(--encre); font-size:13px;">—</span>' : svgFlecheCellule(d, 18)) + "</span>";
+      }
+      html += "</div>";
+    }
+    html += "</div>";
+  }
+  el.innerHTML = html;
+}
+
+/* ---------- Saisie ---------- */
+function choisirDirection(d){
+  if(G.ecran !== "prog" || !G.joueurActif) return;
+  const j = G.joueurActif;
+  if(!G.saisie.id || !G.ordres[j][G.saisie.id]) return;
+  G.ordres[j][G.saisie.id][G.saisie.tic] = d;
+  /* Auto-avance : tic suivant, puis pièce suivante. */
+  const ids = piecesDe(j).map(function(p){ return p.id; });
+  const i = ids.indexOf(G.saisie.id);
+  if(G.saisie.tic < 2){ G.saisie.tic++; }
+  else if(i >= 0 && i < ids.length - 1){ G.saisie = { id:ids[i + 1], tic:0 }; }
+  majUI();
+}
+function surbrillancePave(d){
+  document.querySelectorAll(".pave button").forEach(function(b){
+    b.classList.toggle("surbrillance", parseInt(b.dataset.d, 10) === d);
+  });
+}
+
+/* ---------- Événements DOM ---------- */
+document.getElementById("panneau").addEventListener("click", function(ev){
+  const cell = ev.target.closest(".pg-cell");
+  if(cell){
+    G.saisie = { id:cell.dataset.pid, tic:parseInt(cell.dataset.tic, 10) };
+    majUI(); return;
+  }
+  const pv = ev.target.closest(".pave button");
+  if(pv){ choisirDirection(parseInt(pv.dataset.d, 10)); return; }
+  const dur = ev.target.closest(".duree-btn");
+  if(dur){ changerDuree(parseInt(dur.dataset.ms, 10)); majUI(); return; }
+  if(ev.target.closest("#btn-valider")){ validerProgrammation(false); return; }
+});
+document.getElementById("btn-commencer-prog").addEventListener("click", function(){
+  document.getElementById("overlay-passe").classList.add("cache");
+  commencerProg();
+});
+document.getElementById("btn-nouvelle").addEventListener("click", function(ev){
+  const b = ev.currentTarget;
+  if(b.classList.contains("confirm")){
+    b.classList.remove("confirm"); b.textContent = T("nouvellePartie");
+    nouvellePartie(G.mode === "ia" ? "ia" : "hotseat", { difficulte:G.difficulte });
+  }else{
+    b.classList.add("confirm"); b.textContent = T("confirmer");
+    setTimeout(function(){
+      b.classList.remove("confirm"); b.textContent = T("nouvellePartie");
+    }, 2500);
+  }
+});
+document.getElementById("btn-regles").addEventListener("click", function(){
+  pauseTimer();
+  G.reglesOuvertes = true;
+  document.getElementById("overlay-regles").classList.remove("cache");
+});
+document.getElementById("btn-fermer-regles").addEventListener("click", function(){
+  G.reglesOuvertes = false;
+  document.getElementById("overlay-regles").classList.add("cache");
+  repriseTimer();
+});
+document.getElementById("overlay-regles").addEventListener("click", function(ev){
+  if(ev.target === ev.currentTarget){
+    G.reglesOuvertes = false;
+    ev.currentTarget.classList.add("cache");
+    repriseTimer();
+  }
+});
+document.getElementById("btn-rejouer").addEventListener("click", function(){
+  document.getElementById("overlay-fin").classList.add("cache");
+  nouvellePartie(G.mode === "ia" ? "ia" : "hotseat", { difficulte:G.difficulte });
+});
+document.getElementById("btn-voir-plateau").addEventListener("click", function(){
+  G.finVisible = false;
+  document.getElementById("overlay-fin").classList.add("cache");
+  majUI();
+});
+/* ---------- Accueil : choix du mode ---------- */
+document.getElementById("acc-hotseat").addEventListener("click", function(){
+  nouvellePartie("hotseat");
+});
+/* Bouton central de l’accueil : un clic au centre exact démarre une partie IA (Normal). */
+document.getElementById("acc-ia-central").addEventListener("click", function(){
+  demarrerIaDirect("normal");
+});
+document.getElementById("acc-ia-facile").addEventListener("click", function(){
+  demarrerIaDirect("facile");
+});
+document.getElementById("acc-ligne").addEventListener("click", connecterLigne);
+/* Bascule EN/FR (mémorisée en sessionStorage, silencieuse sous file://). */
+document.getElementById("btn-lang").addEventListener("click", function(){
+  LANG = (LANG === "en") ? "fr" : "en";
+  try{ sessionStorage.setItem("metronome-lang", LANG); }catch(e){ /* muet */ }
+  appliquerLangue();
+});
+document.getElementById("acc-regles").addEventListener("click", function(){
+  pauseTimer();
+  G.reglesOuvertes = true;
+  document.getElementById("overlay-regles").classList.remove("cache");
+});
+document.getElementById("btn-accueil").addEventListener("click", retourAccueil);
+document.getElementById("btn-quitter-salon").addEventListener("click", retourAccueil);
+document.getElementById("btn-salon-quitter").addEventListener("click", retourAccueil);
+document.getElementById("btn-perdu-accueil").addEventListener("click", retourAccueil);
+document.getElementById("btn-fin-accueil").addEventListener("click", function(){
+  document.getElementById("overlay-fin").classList.add("cache");
+  retourAccueil();
+});
+document.addEventListener("visibilitychange", function(){
+  if(document.hidden) pauseTimer(); else if(!G.reglesOuvertes) repriseTimer();
+});
+window.addEventListener("keydown", function(ev){
+  if(ev.key === "Escape" && G.reglesOuvertes){
+    G.reglesOuvertes = false;
+    document.getElementById("overlay-regles").classList.add("cache");
+    repriseTimer();
+  }
+});
+
+/* ---------- Interactions canvas ---------- */
+canvas.addEventListener("mousemove", function(ev){
+  const rect = canvas.getBoundingClientRect();
+  const hex = pixToHex(ev.clientX - rect.left, ev.clientY - rect.top);
+  G.hoverHex = CORE.dansPlateau(hex.q, hex.r) ? hex : null;
+  /* Curseur + surbrillance du pavé selon la direction pointée. */
+  let actionnable = false, dirPointee = null;
+  if(G.ecran === "prog" && G.joueurActif && G.saisie.id){
+    const piece = G.pieces.find(function(p){ return p.id === G.saisie.id && p.joueur === G.joueurActif; });
+    if(piece){
+      const cum = positionsCumulees(piece, G.ordres[G.joueurActif]);
+      const base = cum[G.saisie.tic];
+      if(CORE.dansPlateau(base.q, base.r) && G.hoverHex){
+        if(G.hoverHex.q === base.q && G.hoverHex.r === base.r){ actionnable = true; dirPointee = -1; }
+        else for(let d = 0; d < 6; d++){
+          if(G.hoverHex.q === base.q + CORE.DIRS[d].q && G.hoverHex.r === base.r + CORE.DIRS[d].r){
+            actionnable = true; dirPointee = d; break;
+          }
+        }
+      }
+    }
+  }
+  canvas.style.cursor = actionnable ? "pointer" : "default";
+  if(dirPointee !== null) surbrillancePave(dirPointee);
+  else if(G.ecran === "prog") surbrillancePave(null);
+});
+canvas.addEventListener("mouseleave", function(){
+  G.hoverHex = null;
+  canvas.style.cursor = "default";
+  if(G.ecran === "prog") surbrillancePave(null);
+});
+canvas.addEventListener("click", function(ev){
+  if(G.ecran !== "prog" || !G.joueurActif || !G.saisie.id) return;
+  const rect = canvas.getBoundingClientRect();
+  const hex = pixToHex(ev.clientX - rect.left, ev.clientY - rect.top);
+  if(!CORE.dansPlateau(hex.q, hex.r)) return;
+  const j = G.joueurActif;
+  /* Clic sur une de ses pièces : la sélectionner. */
+  const clicPiece = G.pieces.find(function(p){ return p.joueur === j && p.q === hex.q && p.r === hex.r; });
+  if(clicPiece){
+    /* Première cellule non saisie de cette pièce, sinon tic 1. */
+    let tic = 0;
+    const o = G.ordres[j][clicPiece.id];
+    if(o) for(let t = 0; t < 3; t++){ if(o[t] === null || o[t] === undefined){ tic = t; break; } }
+    G.saisie = { id:clicPiece.id, tic:tic };
+    majUI(); return;
+  }
+  const piece = G.pieces.find(function(p){ return p.id === G.saisie.id && p.joueur === j; });
+  if(!piece) return;
+  const cum = positionsCumulees(piece, G.ordres[j]);
+  const base = cum[G.saisie.tic];
+  if(!CORE.dansPlateau(base.q, base.r)) return;
+  if(hex.q === base.q && hex.r === base.r){ choisirDirection(-1); return; } // rester
+  for(let d = 0; d < 6; d++){
+    if(hex.q === base.q + CORE.DIRS[d].q && hex.r === base.r + CORE.DIRS[d].r){
+      choisirDirection(d); return;
+    }
+  }
+});
+/* Tactile : mapper le toucher sur le même traitement que le clic. */
+canvas.addEventListener("touchstart", function(ev){
+  if(ev.touches.length !== 1) return;
+  const t = ev.touches[0];
+  const rect = canvas.getBoundingClientRect();
+  const hex = pixToHex(t.clientX - rect.left, t.clientY - rect.top);
+  G.hoverHex = CORE.dansPlateau(hex.q, hex.r) ? hex : null;
+}, { passive:true });
+
+/* ---------- Boucle de rendu ---------- */
+function boucle(now){
+  majTimer(now);
+  /* Fin d’animation d’un tic -> appliquer, enchaîner. */
+  if(G.anim && now - G.anim.debut >= G.anim.duree){
+    /* Laisse un court instant final aux effets. */
+    if(!G.animApres){ G.animApres = now + 120; }
+    else if(now >= G.animApres){
+      G.animApres = null;
+      appliquerTic();
+      if(G.ecran === "resolution" || G.ecran === "fin") majUI();
+    }
+  }
+  dessiner(now);
+  if(G.ecran === "prog") majTimerAffichage();
+  requestAnimationFrame(boucle);
+}
+
+/* ---------- Initialisation ---------- */
+redimensionner();
+appliquerLangue();
+retourAccueil();
+requestAnimationFrame(boucle);
+</script>
+</body>
+</html>
