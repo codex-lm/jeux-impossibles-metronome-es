@@ -547,7 +547,7 @@
    I18N — STR : TOUTES les chaînes UI (anglais par défaut, français).
    T(cle, vars) : valeur de la langue courante (fonction autorisée),
    remplace chaque {x} par vars.x. Bascule FR/EN : bouton #btn-lang,
-   mémorisé en sessionStorage (muet, compatible file://).
+   mémorisé en sessionStorage (muet, compatible file://). Espagnol ajouté par la variante metronome-es (Z Code).
    « MÉTRONOME », « Azur » et « Corail » restent inchangés.
    ============================================================ */
 const STR = {
@@ -701,7 +701,7 @@ fr:{
   centreLbl:"Centre",
   nouvellePartie:"Nouvelle partie", confirmer:"Confirmer ?",
   regles:"Règles", quitterSalon:"Quitter le salon", accueilBtn:"Accueil",
-  journalTitre:"Journal de la partie", langVers:"EN",
+  journalTitre:"Journal de la partie", langVers:"ES",
   accSous:"Coups simultanés sur horloge réelle — choisis ton mode",
   accIaCentral:"Jouer contre l’IA",
   accIaCentralDesc:"Normal — tu joues Azur, l’IA programme en secret",
@@ -837,11 +837,155 @@ résolution — un hôte curieux pourrait techniquement le lire avant de lancer 
 Une déconnexion met fin à la partie (retour à l’accueil).</p>
 <div class="impossible">Pourquoi impossible avant l’informatique : programmation secrète simultanée et horloge partagée</div>`
 }
+,es:{
+  titre:"MÉTRONOME — Movimientos simultáneos con reloj real",
+  sousTitre:"Movimientos simultáneos con reloj real",
+  compteursTitle:"Mantenimientos consecutivos del centro — dos compases seguidos = victoria",
+  centreLbl:"Centro",
+  nouvellePartie:"Nueva partida", confirmer:"¿Confirmar?",
+  regles:"Reglas", quitterSalon:"Salir de la sala", accueilBtn:"Inicio",
+  journalTitre:"Registro de la partida", langVers:"EN",
+  accSous:"Movimientos simultáneos con reloj real — elige tu modo",
+  accIaCentral:"Jugar contra la IA",
+  accIaCentralDesc:"Normal — juegas con Azur, la IA programa en secreto",
+  accHotseat:"Dos jugadores — misma pantalla",
+  accHotseatDesc:"Cada jugador programa por turnos tras la pantalla de pase; después caen juntos los tres tics.",
+  accIaFacile:"Jugar contra la IA (Fácil)",
+  accIaFacileDesc:"La IA juega casi al azar — para empezar sin presión.",
+  accLigne:"En línea — sala LOB7",
+  accLigneDesc:"Dos navegadores, una sala de lob7.com; el clientId más pequeño = Azur, anfitrión-árbitro.",
+  lireRegles:"Leer las reglas",
+  salonConnexion:"Conectando a la sala LOB7…",
+  salonAttente:"Sala LOB7 — esperando a un adversario…",
+  salonFerme:"La sala elegida ya no acepta mensajes.",
+  salonIndispo:"Sala LOB7 no disponible{code}.",
+  besoinLob7:"El modo en línea requiere lob7.com.",
+  perduTitre:"CONEXIÓN PERDIDA",
+  retourAccueil:"Volver al inicio",
+  perduDetail:"La conexión con la sala se ha cortado{code}. La partida en línea termina aquí — los modos «misma pantalla» y «contra la IA» siguen disponibles desde la pantalla de inicio.",
+  mesure:"COMPÁS {n}",
+  passeTitre:"Pasa el dispositivo a {nom}",
+  passeSous:"Las posiciones siguen siendo públicas.<br>Solo el programa que vas a introducir es secreto.",
+  passeBtn:"{nom}: programa",
+  passeIaTitre:"Tu turno — {nom}",
+  passeIaSous:"Juegas con <b>Azur</b>. La IA (<b>Corail</b>) programará en secreto después de ti.",
+  passeIaBtn:"Azur: programa",
+  finAzur:"AZUR GANA", finCorail:"CORAIL GANA", finEgalite:"EMPATE",
+  rejouer:"Jugar de nuevo", voirPlateau:"Ver el tablero", fermer:"Cerrar",
+  raisonEgalite:"Ambos bandos perdieron todas sus piezas en el mismo tic.",
+  raisonAzur:"Azur se ha quedado sin piezas.",
+  raisonCorail:"Corail se ha quedado sin piezas.",
+  raisonCentre:"{nom} mantuvo el centro durante dos compases seguidos.",
+  raisonHote:"Fin de la partida (veredicto del anfitrión).",
+  hudAccueil:"Pantalla de inicio",
+  hudAccueilDetail:"Elige un modo: dos jugadores en la misma pantalla, contra la IA o en línea en una sala LOB7.",
+  hudPasseIa:"Tu turno — {nom}",
+  hudPasseIaDetail:"Temporizador y pantalla sin cambios; la IA programará en secreto después de ti.",
+  hudPasse:"Pasa el dispositivo a {nom}",
+  hudPasseDetail:"Las posiciones son públicas; cada jugador programa en secreto.",
+  hudProg:"Tu turno de programar — {nom}{toi}",
+  toi:" (tú)",
+  hudProgDetail:"Una dirección (o «—») por pieza y por tic. Introdúcela en la cuadrícula o haz clic en una casilla vecina de la pieza seleccionada.",
+  hudProgDetailLigne:"Una dirección (o «—») por pieza y por tic. El adversario programa en paralelo en su pantalla — su programa permanece oculto hasta la resolución.",
+  enAttente:"Esperando…",
+  hudAttenteIaDetail:"El programa de la IA (Corail) nunca se muestra antes de la resolución.",
+  hudAttenteLigneDetail:"Los tres tics los resuelve el anfitrión (Azur) y luego se reproducen idénticamente en ambas pantallas.",
+  hudResolution:"Resolución — tic {n}/3",
+  hudResolutionDetail:"Los pasos de cada tic son simultáneos.",
+  emporte:"{nom} gana", egaliteCourt:"Empate", partieTerminee:"Partida terminada",
+  mesureLbl:"Compás {n}", timerLbl:"Temporizador:",
+  tic:"Tic {n}", metronomeLbl:"Metrónomo {n}",
+  rester:"Quedarse en el sitio", valider:"Validar el programa",
+  aideProg:"Las casillas «·» sin completar significan «quedarse» cuando se acaba el tiempo. Haz clic en una casilla vecina del tablero para programar directamente.",
+  programmeLbl:"Programa de {nom}",
+  dirs:["E","NE","NO","O","SO","SE"],
+  et:" y ",
+  diffFacile:"fácil", diffNormal:"normal",
+  jNouvelle:"Nueva partida — {azur} programa primero.",
+  jIa:"Partida contra la IA ({diff}) — juegas con {azur}.",
+  jLigne:"Sala LOB7 — elección: el clientId más pequeño se convierte en {azur} (anfitrión-árbitro). Tú eres {toi}.",
+  jTemps:"Se acabó el tiempo — las órdenes no introducidas de {nom} se convierten en «quedarse».",
+  jValide:"{nom} validó su programa.",
+  attenteIa:"La IA está programando…",
+  jIaProgramme:"{corail} (IA) programó en secreto.",
+  jResMesure:"Compás {n} — resolución.",
+  jMur:function(v){ return v.noms + (v.nb > 1 ? " rebotan: fuera del tablero." : " rebota: fuera del tablero."); },
+  jOccupee:function(v){ return v.noms + (v.nb > 1 ? " rebotan: casilla ocupada por " : " rebota: casilla ocupada por ") + v.par + "."; },
+  jSwap:"Intercambio cruzado: {noms} rebotan.",
+  jAllie:"Colisión entre aliados: {noms} rebotan.",
+  jDuel:"<span class=\"j-or\">Duelo</span> en ({q}, {r}): {noms} se eliminan mutuamente.",
+  jFinMesure:"Fin del compás: {nom} mantiene el centro ({n}/2).",
+  jFinMesureZero:"Fin del compás: ningún jugador mantiene el centro en solitario — los contadores vuelven a cero.",
+  attenteEnvoye:"Programa enviado — esperando a que el anfitrión (Azur) resuelva…",
+  attenteRecu:"Programa de Corail recibido — resolviendo…",
+  attenteCorail:"Esperando el programa de Corail…",
+  jMesureLigne:"Compás {n} — {nom} (tú) programa; el adversario programa en paralelo, en secreto.",
+  jEnvoiProgramme:"Programa de Corail enviado al anfitrión (Azur).",
+  jRecuProgramme:"Programa de Corail recibido — el anfitrión resuelve el compás.",
+  jHoteResout:"Compás {n} resuelto por el anfitrión — difusión a ambas pantallas.",
+  jRejeu:"Resolución del anfitrión recibida (compás {n}) — reproduciendo los tics.",
+  jAlerteSalon:"Sala: problema pasajero ({code}) — reanudación automática.",
+  jConnexionPerdue:"Conexión perdida{code} — regreso a la pantalla de inicio.",
+  reglesHtml:`<h2>REGLAS</h2>
+<div class="sur">Metrónomo — movimientos simultáneos con reloj real</div>
+<h3>El tablero</h3>
+<p>Un hexágono de <b>19 casillas</b> (radio 2) en coordenadas axiales. Cada jugador controla
+<b>3 metrónomos idénticos</b>: Azur al sur (fila r&nbsp;=&nbsp;+2), Corail al norte (r&nbsp;=&nbsp;−2), en espejo.</p>
+<h3>El objetivo — dos formas de ganar</h3>
+<ul>
+  <li><b>Eliminación</b>: deja a tu adversario sin piezas (se comprueba después de cada tic).</li>
+  <li><b>El centro</b>: al final de un compás, si un <b>solo</b> jugador ocupa el centro (0,0),
+  su contador de «centro» aumenta; si no, ambos contadores vuelven a cero.
+  <b>Dos compases consecutivos</b> manteniendo el centro = victoria.</li>
+</ul>
+<h3>Un compás</h3>
+<p>1) <b>Azur programa</b> (en secreto, tras la pantalla «Pasa el dispositivo»);
+2) <b>Corail programa</b> (en secreto); 3) <b>Resolución</b>: 3 tics jugados uno tras otro,
+cada tic es <b>totalmente simultáneo</b>.</p>
+<h3>Programación</h3>
+<p>Para cada uno de los 3 tics, cada una de tus piezas en juego recibe <b>una dirección de entre 6</b>
+o <b>«—»</b> (quedarse): una pieza cruza como máximo una casilla por tic.
+Las órdenes se introducen en la cuadrícula (filas = piezas, columnas = tics) o haciendo clic en las casillas vecinas del tablero.
+<b>Temporizador</b> por fase (15 / 30 / 60 s): al llegar a 0, las órdenes no introducidas se convierten en «quedarse».
+El botón <b>Validar</b> cierra la fase antes de tiempo (las órdenes no introducidas cuentan entonces como «quedarse»).</p>
+<h3>Resolución de un tic (pasos simultáneos)</h3>
+<ul>
+  <li>Fuera del tablero, o hacia una casilla ocupada por una pieza que <b>no la libera</b> en este tic → <b>rebote</b> (la pieza se queda).</li>
+  <li>Dos piezas <b>enemigas</b> hacia la misma casilla libre → <b>duelo</b>: ambas quedan eliminadas.
+  (Tres o más piezas de bandos opuestos hacia la misma casilla: todas eliminadas; mismo bando: rebote.)</li>
+  <li>Dos piezas <b>aliadas</b> hacia la misma casilla → ambas rebotan.</li>
+  <li><b>Intercambio cruzado</b> (A hacia la casilla de B mientras B se dirige a la de A) → ambas rebotan.</li>
+  <li>Una casilla <b>liberada</b> en este tic puede ocuparse de inmediato — incluidas las cadenas
+  (A la libera para B, que la libera para C…).</li>
+  <li>Un jugador que se queda sin piezas a mitad de compás → la partida termina de inmediato. Ambos sin piezas en el mismo tic → <b>empate</b>.</li>
+</ul>
+<p>El contador del centro se muestra en todo momento en la parte superior de la pantalla.</p>
+<h3>Contra la IA</h3>
+<p>Juegas con <b>Azur</b>, la IA juega con <b>Corail</b>. Tu fase de programación no cambia
+(temporizador + pantalla de introducción); después la IA programa en secreto — su programa
+<b>nunca se muestra antes de la resolución</b>. En <b>Normal</b> avanza hacia el centro y hacia
+tus piezas cercanas, evita duelos evidentes (nunca apunta a una casilla adyacente a dos enemigos,
+nunca envía dos aliados a la misma casilla) e intenta mantener el centro al final del compás,
+con un toque de azar en sus decisiones. En <b>Fácil</b> juega casi al azar
+(solo direcciones válidas).</p>
+<h3>En línea — sala LOB7</h3>
+<p>Dos navegadores se unen a la misma sala en <b>lob7.com</b>, y cada jugador programa
+<b>en secreto en su propia pantalla</b> (sin pantalla de pase: nunca ves el programa
+del adversario antes de la resolución). Al validar — o cuando expira el temporizador —
+<b>Corail envía su programa</b>; en cuanto se conocen ambos programas, <b>Azur
+(anfitrión-árbitro)</b> resuelve los tres tics con el motor del juego y difunde el resultado,
+que se reproduce idénticamente en ambas pantallas. El anfitrión calcula la victoria.
+<b>Nota honesta:</b> el anfitrión-árbitro recibe el programa de Corail en el momento de la resolución —
+un anfitrión curioso podría técnicamente leerlo antes de iniciar la animación.
+Una desconexión pone fin a la partida (regreso a la pantalla de inicio).</p>
+<div class="impossible">Por qué era imposible antes de la informática: programación secreta simultánea con un reloj compartido</div>`
+}
 };
+
 let LANG = "en";
 try{
   const stockee = sessionStorage.getItem("metronome-lang");
-  if(stockee === "fr" || stockee === "en") LANG = stockee;
+  if(stockee === "fr" || stockee === "en" || stockee === "es") LANG = stockee;
 }catch(e){ /* file:// : silencieux */ }
 function T(cle, vars){
   const table = STR[LANG] || STR.en;
@@ -2551,9 +2695,9 @@ document.getElementById("acc-ia-facile").addEventListener("click", function(){
   demarrerIaDirect("facile");
 });
 document.getElementById("acc-ligne").addEventListener("click", connecterLigne);
-/* Bascule EN/FR (mémorisée en sessionStorage, silencieuse sous file://). */
+/* Bascule EN/FR/ES en cycle (mémorisée en sessionStorage, silencieuse sous file://). */
 document.getElementById("btn-lang").addEventListener("click", function(){
-  LANG = (LANG === "en") ? "fr" : "en";
+  LANG = (LANG === "en") ? "fr" : (LANG === "fr") ? "es" : "en";
   try{ sessionStorage.setItem("metronome-lang", LANG); }catch(e){ /* muet */ }
   appliquerLangue();
 });
